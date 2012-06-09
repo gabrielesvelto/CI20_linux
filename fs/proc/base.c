@@ -677,7 +677,6 @@ static int mounts_open_common(struct inode *inode, struct file *file,
 	if (ret)
 		goto err_free;
 
-	p->m.private = p;
 	p->ns = ns;
 	p->root = root;
 	p->event = ns->event;
@@ -696,7 +695,7 @@ static int mounts_open_common(struct inode *inode, struct file *file,
 
 static int mounts_release(struct inode *inode, struct file *file)
 {
-	struct proc_mounts *p = file->private_data;
+	struct proc_mounts *p = proc_mounts(file->private_data);
 	path_put(&p->root);
 	put_mnt_ns(p->ns);
 	return seq_release(inode, file);
@@ -704,7 +703,7 @@ static int mounts_release(struct inode *inode, struct file *file)
 
 static unsigned mounts_poll(struct file *file, poll_table *wait)
 {
-	struct proc_mounts *p = file->private_data;
+	struct proc_mounts *p = proc_mounts(file->private_data);
 	unsigned res = POLLIN | POLLRDNORM;
 
 	poll_wait(file, &p->ns->poll, wait);
