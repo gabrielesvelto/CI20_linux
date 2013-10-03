@@ -1,0 +1,34 @@
+Ingenic jz4780 SoC EHCI controller binding
+
+The Ingenic jz4780 SoC includes an EHCI compliant USB host controller
+interface for use with USB 2.0 devices.
+
+Required properties:
+ - compatible: Should be "ingenic,jz4780-ehci".
+ - reg: Should contain the address & size of the EHCI controller registers.
+ - interrupt-parent: Should be the phandle of the interrupt controller that
+   delivers interrupts to the EHCI block.
+ - interrupts: Should specify the interrupt provided by interrupt-parent.
+ - clocks: Should contain a single clock specifier for the jz4780 UHC clock.
+ - ingenic,vbus-gpio: Should be a gpio-list specifying the GPIO used to drive
+   VBUS.
+
+Example SoC include file:
+
+/ {
+	ehci: jz4780-ehci@13490000 {
+		compatible = "ingenic,jz4780-ehci";
+		reg = <0x13490000 0x10000>;
+
+		interrupt-parent = <&intc>;
+		interrupts = <20>;
+
+		clocks = <&cgu JZ4780_CLK_UHC>;
+	};
+};
+
+Example board file:
+
+&ehci {
+	ingenic,vbus-gpio = <&gpf 15 0>;
+};
