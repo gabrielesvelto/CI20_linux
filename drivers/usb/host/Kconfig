@@ -217,6 +217,17 @@ config USB_EHCI_TEGRA
          This driver enables support for the internal USB Host Controllers
          found in NVIDIA Tegra SoCs. The controllers are EHCI compliant.
 
+config USB_EHCI_JZ4780
+       tristate "Ingenic jz4780 HCD support"
+       depends on MACH_JZ4780
+       help
+         This driver enables support for the internal EHCI compliant USB
+         host controller found in the Ingenic jz4780 SoC.
+         The EHCI controller provides support for USB 2.0 devices, but has
+         no root-hub transaction translator so you are likely to want to
+         enable support for the OHCI controller too in order to use USB
+         1.x devices.
+
 config USB_EHCI_HCD_PPC_OF
 	bool "EHCI support for PPC USB controller on OF platform bus"
 	depends on PPC_OF
