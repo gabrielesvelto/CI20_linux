@@ -241,13 +241,20 @@ static int jz4740_ohci_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static struct of_device_id jz4740_ohci_of_match[] = {
+	{ .compatible = "ingenic,jz4740-ohci", },
+	{ },
+};
+
 static struct platform_driver ohci_hcd_jz4740_driver = {
 	.probe = jz4740_ohci_probe,
 	.remove = jz4740_ohci_remove,
 	.driver = {
 		.name = "jz4740-ohci",
+		.of_match_table = jz4740_ohci_of_match,
 		.owner = THIS_MODULE,
 	},
 };
 
 MODULE_ALIAS("platform:jz4740-ohci");
+MODULE_DEVICE_TABLE(of, jz4740_ohci_of_match);
