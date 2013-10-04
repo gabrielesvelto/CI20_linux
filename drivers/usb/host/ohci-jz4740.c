@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
+#include <asm/mach-jz4780/jz4780-cgu.h>
 
 struct jz4740_ohci_hcd {
 	struct ohci_hcd ohci_hcd;
@@ -200,6 +201,14 @@ static int jz4740_ohci_probe(struct platform_device *pdev)
 	if (jz4740_ohci->vbus)
 		ohci_jz4740_set_vbus_power(jz4740_ohci, true);
 
+	if (of_machine_is_compatible("ingenic,jz4780-ohci")) {
+		ret = jz4780_cgu_set_usb_suspend(USB_PORT_HOST, false);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to unsuspend port\n");
+			goto err_disable;
+		}
+	}
+
 	platform_set_drvdata(pdev, hcd);
 
 	ohci_hcd_init(hcd_to_ohci(hcd));
@@ -243,6 +252,7 @@ static int jz4740_ohci_remove(struct platform_device *pdev)
 
 static struct of_device_id jz4740_ohci_of_match[] = {
 	{ .compatible = "ingenic,jz4740-ohci", },
+	{ .compatible = "ingenic,jz4780-ohci", },
 	{ },
 };
 
