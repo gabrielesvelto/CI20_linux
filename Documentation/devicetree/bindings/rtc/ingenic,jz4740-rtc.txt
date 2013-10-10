@@ -1,0 +1,17 @@
+* Ingenic jz47XX Real Time Clock
+
+Real Time Clock on Ingenic jz47XX series SoCs
+
+Required properties:
+- compatible : Should be "ingenic,jz4740-rtc" or "ingenic,jz4780-rtc"
+- reg: Should contain the RTC registers location and length.
+- interrupts: Should contain the interrupt specifier of the RTC.
+
+Examples:
+
+  rtc: rtc@10003000 {
+    compatible = "ingenic,jz4780-rtc";
+    reg = <0x10003000 0x4c>;
+    interrupt-parent = <&intc>;
+    interrupts = <32>;
+  };
