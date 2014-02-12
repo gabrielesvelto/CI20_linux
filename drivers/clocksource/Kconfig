@@ -223,4 +223,13 @@ config CLKSRC_VERSATILE
 	  ARM Versatile, RealView and Versatile Express reference
 	  platforms.
 
+config JZ47XX_TCU
+	bool
+
+config JZ4780_TCU
+	def_bool y if MACH_JZ4780
+	select JZ47XX_TCU
+	help
+	  Support for the timer/counter unit of the Ingenic jz4780 SoC.
+
 endmenu
