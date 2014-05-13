@@ -21,6 +21,7 @@ endif
 
 ifneq ($(CONFIG_USB_DWC2_PLATFORM),)
 	obj-$(CONFIG_USB_DWC2_HOST)	+= dwc2_platform.o
+	obj-$(CONFIG_USB_DWC2_JZ4780)	+= jz4780_platform.o
 	dwc2_platform-y			:= platform.o
 endif
 
