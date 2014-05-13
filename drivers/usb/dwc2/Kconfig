@@ -36,6 +36,13 @@ config USB_DWC2_PLATFORM
 	  controllers directly connected to the CPU. This is only
 	  used for host mode.
 
+config USB_DWC2_JZ4780
+	bool "Enable support for JZ4780 SoC"
+	depends on MACH_JZ4780 && USB_DWC2_PLATFORM
+	help
+	  Say Y here to enable the DWC2 Driver for the JZ4780 SoC.
+	  This SoC has an OTG controller based on the Synopsys DWC Core
+
 config USB_DWC2_PCI
 	bool "DWC2 PCI"
 	depends on USB_DWC2_HOST && PCI
