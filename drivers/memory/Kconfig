@@ -85,4 +85,13 @@ config FSL_IFC
 	bool
 	depends on FSL_SOC
 
+config JZ47XX_NEMC
+	bool "Ingenic JZ47xx SoC NEMC driver"
+	default y
+	depends on MACH_JZ4780
+	help
+	  This driver is for the NAND/External Memory Controller (NEMC) in
+	  the Ingenic JZ4760 and later SoCs. This controller is used to
+	  handle external memory devices such as NAND and SRAM.
+
 endif
