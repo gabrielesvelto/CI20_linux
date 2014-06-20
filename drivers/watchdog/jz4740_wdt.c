@@ -24,13 +24,16 @@
 #include <linux/clk.h>
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/of.h>
+#include <linux/bitops.h>
 
-#include <asm/mach-jz4740/timer.h>
 
 #define JZ_REG_WDT_TIMER_DATA     0x0
 #define JZ_REG_WDT_COUNTER_ENABLE 0x4
 #define JZ_REG_WDT_TIMER_COUNTER  0x8
 #define JZ_REG_WDT_TIMER_CONTROL  0xC
+#define JZ_REG_TIMER_STOP_SET     0x2C
+#define JZ_REG_TIMER_STOP_CLEAR   0x3C
 
 #define JZ_WDT_CLOCK_PCLK 0x1
 #define JZ_WDT_CLOCK_RTC  0x2
@@ -113,7 +116,9 @@ static int jz4740_wdt_set_timeout(struct watchdog_device *wdt_dev,
 
 static int jz4740_wdt_start(struct watchdog_device *wdt_dev)
 {
-	jz4740_timer_enable_watchdog();
+	struct jz4740_wdt_drvdata *drvdata = watchdog_get_drvdata(wdt_dev);
+
+	writel(BIT(16), drvdata->base + JZ_REG_TIMER_STOP_CLEAR);
 	jz4740_wdt_set_timeout(wdt_dev, wdt_dev->timeout);
 
 	return 0;
@@ -123,7 +128,7 @@ static int jz4740_wdt_stop(struct watchdog_device *wdt_dev)
 {
 	struct jz4740_wdt_drvdata *drvdata = watchdog_get_drvdata(wdt_dev);
 
-	jz4740_timer_disable_watchdog();
+	writel(BIT(16), drvdata->base + JZ_REG_TIMER_STOP_SET);
 	writeb(0x0, drvdata->base + JZ_REG_WDT_COUNTER_ENABLE);
 
 	return 0;
@@ -140,6 +145,12 @@ static const struct watchdog_ops jz4740_wdt_ops = {
 	.stop = jz4740_wdt_stop,
 	.ping = jz4740_wdt_ping,
 	.set_timeout = jz4740_wdt_set_timeout,
+};
+
+static const struct of_device_id jz4740_of_matches[] = {
+	{ .compatible = "ingenic,jz4780-watchdog", },
+	{ .compatible = "ingenic,jz4740-watchdog", },
+	{ /* sentinel */ }
 };
 
 static int jz4740_wdt_probe(struct platform_device *pdev)
@@ -212,6 +223,7 @@ static struct platform_driver jz4740_wdt_driver = {
 	.driver = {
 		.name = "jz4740-wdt",
 		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(jz4740_of_matches),
 	},
 };
 
