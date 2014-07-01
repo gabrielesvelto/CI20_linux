@@ -1,0 +1,13 @@
+config DRM_JZ4780
+	tristate "DRM Support for Ingenic JZ4780 LCDC Display Controller"
+	depends on DRM && OF
+	select DRM_KMS_HELPER
+	select DRM_KMS_FB_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_GEM_CMA_HELPER
+	select VIDEOMODE_HELPERS
+	select BACKLIGHT_CLASS_DEVICE
+	select BACKLIGHT_LCD_SUPPORT
+	help
+	  Choose this option if you have an Ingenic SoC with LCDC display
+	  controller, for example the CI20 board
