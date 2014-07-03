@@ -1,0 +1,35 @@
+Ingenic jz47xx SoC OHCI controller binding
+
+The Ingenic jz47xx SoC includes an OHCI compliant USB host controller
+interface for use with USB 1.1 devices.
+
+Required properties:
+ - compatible: Should be "ingenic,jz4780-OHCI" or "ingenic,jz4740-OHCI"
+ - reg: Should contain the address & size of the OHCI controller registers.
+ - interrupt-parent: Should be the phandle of the interrupt controller that
+   delivers interrupts to the OHCI block.
+ - interrupts: Should specify the interrupt provided by interrupt-parent.
+ - clocks: Should contain a single clock specifier for the SoC UHC clock.
+ - ingenic,vbus-gpio: Should be a gpio-list specifying the GPIO used to drive
+   VBUS.
+
+Example SoC include file for jz4780:
+
+/ {
+	ohci: jz4780-ohci@0x134a0000 {
+		compatible = "ingenic,jz4780-ohci";
+		reg = <0x134a0000 0x10000>;
+
+		interrupt-parent = <&intc>;
+		interrupts = <5>;
+
+		clocks = <&cgu JZ4780_CLK_UHC>;
+		clock-names = "uhc";
+	};
+};
+
+Example board file:
+
+&ohci {
+	ingenic,vbus-gpio = <&gpf 15 0>;
+};
