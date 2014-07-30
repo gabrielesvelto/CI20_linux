@@ -20,6 +20,8 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/clk-provider.h>
+#include <linux/clkdev.h>
 #include <linux/rtc.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -31,6 +33,7 @@
 #define JZ_REG_RTC_HIBERNATE	0x20
 #define JZ_REG_RTC_SCRATCHPAD	0x34
 #define JZ_REG_RTC_WENR		0x3C
+#define JZ_REG_RTC_CKPCR	0x40
 
 #define JZ_RTC_CTRL_WRDY	BIT(7)
 #define JZ_RTC_CTRL_1HZ		BIT(6)
@@ -42,6 +45,13 @@
 
 #define JZ_RTC_WENR_PAT		0xA55A
 #define JZ_RTC_WENR_WEN		BIT(31)
+
+#define JZ_RTC_CKPCR_CK32CTL_SHIFT	1
+#define JZ_RTC_CKPCR_CK32CTL_INPUT	0x0
+#define JZ_RTC_CKPCR_CK32CTL_OUTPUT	0x1
+#define JZ_RTC_CKPCR_CK32CTL_GPIO	0x2
+#define JZ_RTC_CKPCR_CK32CTL_CLK32K	0x3
+#define JZ_RTC_CKPCR_CK32CTL_CK32PULL	BIT(4)
 
 enum jz4740_rtc_version {
 	JZ_RTC_JZ4740,
@@ -57,6 +67,11 @@ struct jz4740_rtc {
 	int irq;
 
 	spinlock_t lock;
+
+#ifdef CONFIG_COMMON_CLK
+	struct clk_hw clkout_hw;
+#endif
+
 };
 
 static inline uint32_t jz4740_rtc_reg_read(struct jz4740_rtc *rtc, size_t reg)
@@ -245,6 +260,62 @@ static irqreturn_t jz4740_rtc_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+/*
+ * Handling of the clkout
+ */
+
+#ifdef CONFIG_COMMON_CLK
+
+static int jz4740_rtc_clkout_enable(struct clk_hw *hw)
+{
+	struct jz4740_rtc *rtc = container_of(hw, struct jz4740_rtc, clkout_hw);
+	int reg = (JZ_RTC_CKPCR_CK32CTL_CLK32K << JZ_RTC_CKPCR_CK32CTL_SHIFT)
+		   & ~JZ_RTC_CKPCR_CK32CTL_CK32PULL;
+
+	jz4740_rtc_reg_write(rtc, JZ_REG_RTC_CKPCR, reg);
+	return 0;
+}
+
+static void jz4740_rtc_clkout_disable(struct clk_hw *hw)
+{
+	struct jz4740_rtc *rtc = container_of(hw, struct jz4740_rtc, clkout_hw);
+	int reg = JZ_RTC_CKPCR_CK32CTL_CK32PULL;
+
+	jz4740_rtc_reg_write(rtc, JZ_REG_RTC_CKPCR, reg);
+}
+
+static const struct clk_ops jz4740_rtc_clkout_ops = {
+	.enable = jz4740_rtc_clkout_enable,
+	.disable = jz4740_rtc_clkout_disable,
+};
+
+static struct clk *jz4740_rtc_register_clkout(struct device *dev,
+					   struct jz4740_rtc *rtc)
+{
+	struct device_node *node = dev->of_node;
+	struct clk *clk;
+	struct clk_init_data init;
+
+	init.name = "jz4740-rtc32k-clkout";
+	init.ops = &jz4740_rtc_clkout_ops;
+	init.flags = CLK_IS_ROOT;
+	init.parent_names = NULL;
+	init.num_parents = 0;
+	rtc->clkout_hw.init = &init;
+
+	/* register the clock */
+	clk = devm_clk_register(dev, &rtc->clkout_hw);
+
+	if (!IS_ERR(clk)) {
+		clk_register_clkdev(clk, init.name, NULL);
+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+	}
+
+	return clk;
+}
+#endif
+
+
 static const struct of_device_id jz4740_rtc_of_match[] = {
 	{ .compatible = "ingenic,jz4740-rtc", .data = (void *)JZ_RTC_JZ4740 },
 	{ .compatible = "ingenic,jz4780-rtc", .data = (void *)JZ_RTC_JZ4780 },
@@ -312,6 +383,24 @@ static int jz4740_rtc_probe(struct platform_device *pdev)
 		}
 	}
 
+#ifdef CONFIG_COMMON_CLK
+	if (rtc->version >= JZ_RTC_JZ4780)
+		jz4740_rtc_register_clkout(&pdev->dev, rtc);
+#endif
+	return 0;
+}
+
+static int jz4740_rtc_remove(struct platform_device *pdev)
+{
+	struct jz4740_rtc *rtc = platform_get_drvdata(pdev);
+
+#ifdef CONFIG_COMMON_CLK
+	if (rtc->version >= JZ_RTC_JZ4780) {
+		clk_disable_unprepare(rtc->clkout_hw.clk);
+		clk_unregister(rtc->clkout_hw.clk);
+	}
+#endif
+
 	return 0;
 }
 
@@ -346,6 +435,7 @@ static const struct dev_pm_ops jz4740_pm_ops = {
 
 static struct platform_driver jz4740_rtc_driver = {
 	.probe	 = jz4740_rtc_probe,
+	.remove	 = jz4740_rtc_remove,
 	.driver	 = {
 		.name  = "jz4740-rtc",
 		.owner = THIS_MODULE,
