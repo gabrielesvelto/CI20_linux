@@ -142,6 +142,8 @@ struct jz47xx_mmc_host {
 	int irq;
 	struct dma_chan *dmac;
 
+	struct completion comp;
+
 	void __iomem *base;
 	dma_addr_t phys_base;
 	struct mmc_request *req;
@@ -606,6 +608,11 @@ static void jz47xx_mmc_send_command(struct jz47xx_mmc_host *host,
 	jz47xx_mmc_clock_enable(host, 1);
 }
 
+static void jz47xx_mmc_dma_complete_func(void *completion)
+{
+	complete(completion);
+}
+
 static irqreturn_t jz47xx_mmc_irq_worker(int irq, void *devid)
 {
 	struct jz47xx_mmc_host *host = (struct jz47xx_mmc_host *)devid;
@@ -627,7 +634,16 @@ static irqreturn_t jz47xx_mmc_irq_worker(int irq, void *devid)
 	case JZ_MMC_STATE_TRANSFER_DATA:
 		if (host->desc) {
 			dmaengine_submit(host->desc);
+			init_completion(&host->comp);
+			host->desc->callback = jz47xx_mmc_dma_complete_func;
+			host->desc->callback_param = &host->comp;
 			dma_async_issue_pending(host->dmac);
+			timeout = wait_for_completion_timeout(&host->comp,
+							msecs_to_jiffies(1000));
+			if (timeout == 0) {
+				cmd->error = -ETIMEDOUT;
+				break;
+			}
 		} else {
 			if (cmd->data->flags & MMC_DATA_READ)
 				timeout = jz47xx_mmc_read_pio(host, cmd->data);
