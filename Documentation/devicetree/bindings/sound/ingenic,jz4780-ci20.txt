@@ -1,0 +1,14 @@
+CI20 audio driver
+
+Required properties:
+- compatible : "ingenic,ci20-audio"
+- ingenic,i2s-controller = phandle of jz4780 i2c controller
+- ingenic,codec = phandle of jz4780 codec
+
+Example:
+
+audio: audio-ci20 {
+	compatible = "ingenic,ci20-audio";
+	ingenic,i2s-controller = <&i2s>;
+	ingenic,codec = <&codec>;
+};
