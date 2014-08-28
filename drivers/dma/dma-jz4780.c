@@ -546,9 +546,9 @@ static enum dma_status jz4780_dma_tx_status(struct dma_chan *chan,
 	spin_lock_irqsave(&jzchan->vchan.lock, flags);
 
 	vdesc = vchan_find_desc(&jzchan->vchan, cookie);
-	if (vdesc && jzchan->desc && vdesc == &jzchan->desc->vdesc
-		&& jzchan->desc->status & (JZ_DMA_DCS_AR | JZ_DMA_DCS_HLT))
-			status = DMA_ERROR;
+	if (jzchan->desc && vdesc == &jzchan->desc->vdesc
+	    && jzchan->desc->status & (JZ_DMA_DCS_AR | JZ_DMA_DCS_HLT))
+		status = DMA_ERROR;
 
 	spin_unlock_irqrestore(&jzchan->vchan.lock, flags);
 	return status;
