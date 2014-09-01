@@ -137,8 +137,6 @@ struct jz47xx_mmc_host {
 	struct clk *clk;
 
 	enum jz47xx_mmc_version version;
-	int gpio_power;
-	bool power_active_low;
 	int irq;
 	struct dma_chan *dmac;
 
@@ -785,19 +783,24 @@ static void jz47xx_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
+
 		jz47xx_mmc_reset(host);
-		if (gpio_is_valid(host->gpio_power))
-			gpio_set_value(host->gpio_power,
-					!host->power_active_low);
 		host->cmdat |= JZ_MMC_CMDAT_INIT;
 		clk_prepare_enable(host->clk);
 		break;
 	case MMC_POWER_ON:
 		break;
+
+	case MMC_POWER_OFF:
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+		break;
+
 	default:
-		if (gpio_is_valid(host->gpio_power))
-			gpio_set_value(host->gpio_power,
-					host->power_active_low);
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
 		clk_disable_unprepare(host->clk);
 		break;
 	}
@@ -883,7 +886,6 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 	struct jz47xx_mmc_platform_data *pdata;
 	struct resource *res;
 	const struct of_device_id *match;
-	enum of_gpio_flags flags;
 
 	mmc = mmc_alloc_host(sizeof(struct jz47xx_mmc_host), &pdev->dev);
 	if (!mmc) {
@@ -927,9 +929,7 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_free_host;
 
-		host->gpio_power = of_get_named_gpio_flags(pdev->dev.of_node,
-					"ingenic,power-gpio", 0, &flags);
-		host->power_active_low = flags & OF_GPIO_ACTIVE_LOW;
+		mmc_regulator_get_supply(mmc);
 	} else {
 		host->version = platform_get_device_id(pdev)->driver_data;
 
@@ -969,9 +969,6 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 			if (ret)
 				goto err_free_host;
 		}
-
-		host->gpio_power = pdata->gpio_power;
-		host->power_active_low = pdata->power_active_low;
 	}
 
 	/*
@@ -982,17 +979,6 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "8 bit bus width is unsupported\n");
 		ret = -EINVAL;
 		goto err_free_host;
-	}
-
-	if (gpio_is_valid(host->gpio_power)) {
-		ret = devm_gpio_request_one(&pdev->dev, host->gpio_power,
-				(host->power_active_low) ? GPIOF_INIT_HIGH : 0,
-				"MMC power");
-		if (ret) {
-			dev_err(&pdev->dev,
-				"Failed to request power gpio: %d\n", ret);
-			goto err_free_host;
-		}
 	}
 
 #ifdef CONFIG_MACH_JZ4740
