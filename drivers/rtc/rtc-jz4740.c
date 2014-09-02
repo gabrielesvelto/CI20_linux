@@ -384,8 +384,10 @@ static int jz4740_rtc_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_COMMON_CLK
-	if (rtc->version >= JZ_RTC_JZ4780)
+	if (rtc->version >= JZ_RTC_JZ4780) {
 		jz4740_rtc_register_clkout(&pdev->dev, rtc);
+		clk_prepare_enable(rtc->clkout_hw.clk);
+	}
 #endif
 	return 0;
 }
