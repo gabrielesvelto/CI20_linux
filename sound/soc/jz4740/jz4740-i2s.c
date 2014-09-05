@@ -58,6 +58,12 @@
 
 #define JZ_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET 12
 #define JZ_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET 8
+#define JZ4780_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET 24
+#define JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET 16
+#define JZ4780_AIC_CONF_FIFO_RX_THRESHOLD_MASK \
+			(0xf << JZ4780_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET)
+#define JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_MASK \
+			(0x1f <<  JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET)
 
 #define JZ_AIC_CTRL_OUTPUT_SAMPLE_SIZE_MASK (0x7 << 19)
 #define JZ_AIC_CTRL_INPUT_SAMPLE_SIZE_MASK (0x7 << 16)
@@ -88,6 +94,13 @@
 #define JZ_AIC_CLK_DIV_MASK 0xf
 #define I2SDIV_DV_SHIFT 8
 #define I2SDIV_DV_MASK (0xf << I2SDIV_DV_SHIFT)
+#define I2SDIV_IDV_SHIFT 8
+#define I2SDIV_IDV_MASK (0xf << I2SDIV_IDV_SHIFT)
+
+enum jz47xx_i2s_version {
+	JZ_I2S_JZ4740,
+	JZ_I2S_JZ4780,
+};
 
 struct jz4740_i2s {
 	struct resource *mem;
@@ -99,6 +112,8 @@ struct jz4740_i2s {
 
 	struct snd_dmaengine_dai_dma_data playback_dma_data;
 	struct snd_dmaengine_dai_dma_data capture_dma_data;
+
+	enum jz47xx_i2s_version version;
 };
 
 static inline uint32_t jz4740_i2s_read(const struct jz4740_i2s *i2s,
@@ -268,13 +283,22 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 			ctrl |= JZ_AIC_CTRL_MONO_TO_STEREO;
 		else
 			ctrl &= ~JZ_AIC_CTRL_MONO_TO_STEREO;
+
+		div_reg &= ~I2SDIV_DV_MASK;
+		div_reg |= (div - 1) << I2SDIV_DV_SHIFT;
 	} else {
 		ctrl &= ~JZ_AIC_CTRL_INPUT_SAMPLE_SIZE_MASK;
 		ctrl |= sample_size << JZ_AIC_CTRL_INPUT_SAMPLE_SIZE_OFFSET;
+
+		if (i2s->version >= JZ_I2S_JZ4780) {
+			div_reg &= ~I2SDIV_IDV_MASK;
+			div_reg |= (div - 1) << I2SDIV_IDV_SHIFT;
+		} else {
+			div_reg &= ~I2SDIV_DV_MASK;
+			div_reg |= (div - 1) << I2SDIV_DV_SHIFT;
+		}
 	}
 
-	div_reg &= ~I2SDIV_DV_MASK;
-	div_reg |= (div - 1) << I2SDIV_DV_SHIFT;
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CTRL, ctrl);
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CLK_DIV, div_reg);
 
@@ -362,7 +386,7 @@ static void jz4740_i2c_init_pcm_config(struct jz4740_i2s *i2s)
 static int jz4740_i2s_dai_probe(struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-	uint32_t conf;
+	uint32_t conf, reg;
 
 	clk_prepare_enable(i2s->clk_aic);
 
@@ -370,11 +394,24 @@ static int jz4740_i2s_dai_probe(struct snd_soc_dai *dai)
 	snd_soc_dai_init_dma_data(dai, &i2s->playback_dma_data,
 		&i2s->capture_dma_data);
 
-	conf = (7 << JZ_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET) |
-		(8 << JZ_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET) |
-		JZ_AIC_CONF_OVERFLOW_PLAY_LAST |
-		JZ_AIC_CONF_I2S |
-		JZ_AIC_CONF_INTERNAL_CODEC;
+	if (i2s->version >= JZ_I2S_JZ4780) {
+		conf = (7 << JZ4780_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET) |
+			(8 << JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET) |
+			JZ_AIC_CONF_OVERFLOW_PLAY_LAST |
+			JZ_AIC_CONF_I2S |
+			JZ_AIC_CONF_INTERNAL_CODEC;
+	} else {
+		conf = (7 << JZ_AIC_CONF_FIFO_RX_THRESHOLD_OFFSET) |
+			(8 << JZ_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET) |
+			JZ_AIC_CONF_OVERFLOW_PLAY_LAST |
+			JZ_AIC_CONF_I2S |
+			JZ_AIC_CONF_INTERNAL_CODEC;
+	}
+
+	/* I2S operation from SYS_CLK */
+	reg = jz4740_i2s_read(i2s, JZ_REG_AIC_I2S_FMT);
+	reg |= JZ_AIC_I2S_FMT_ENABLE_SYS_CLK;
+	jz4740_i2s_write(i2s, JZ_REG_AIC_I2S_FMT, reg);
 
 	/* enable codec sysclk */
 	clk_set_rate(i2s->clk_i2s, 12000000);
@@ -432,7 +469,8 @@ static const struct snd_soc_component_driver jz4740_i2s_component = {
 };
 
 static const struct of_device_id jz4740_of_matches[] = {
-	{ .compatible = "ingenic,jz4740-i2s" },
+	{ .compatible = "ingenic,jz4740-i2s", .data = (void *)JZ_I2S_JZ4740 },
+	{ .compatible = "ingenic,jz4780-i2s", .data = (void *)JZ_I2S_JZ4780 },
 	{ /* sentinel */ }
 };
 
@@ -441,10 +479,15 @@ static int jz4740_i2s_dev_probe(struct platform_device *pdev)
 	struct jz4740_i2s *i2s;
 	struct resource *mem;
 	int ret;
+	const struct of_device_id *match;
 
 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
 	if (!i2s)
 		return -ENOMEM;
+
+	match = of_match_device(jz4740_of_matches, &pdev->dev);
+	if (match)
+		i2s->version = (enum jz47xx_i2s_version)match->data;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	i2s->base = devm_ioremap_resource(&pdev->dev, mem);
@@ -468,8 +511,12 @@ static int jz4740_i2s_dev_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	return devm_snd_dmaengine_pcm_register(&pdev->dev, NULL,
-		SND_DMAENGINE_PCM_FLAG_COMPAT);
+	if (i2s->version >= JZ_I2S_JZ4780)
+		return devm_snd_dmaengine_pcm_register(&pdev->dev, NULL,
+			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+	else
+		return devm_snd_dmaengine_pcm_register(&pdev->dev, NULL,
+			SND_DMAENGINE_PCM_FLAG_COMPAT);
 }
 
 static struct platform_driver jz4740_i2s_driver = {
