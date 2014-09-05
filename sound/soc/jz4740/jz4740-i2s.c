@@ -14,6 +14,8 @@
 
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -364,6 +366,10 @@ static int jz4740_i2s_dai_probe(struct snd_soc_dai *dai)
 		JZ_AIC_CONF_I2S |
 		JZ_AIC_CONF_INTERNAL_CODEC;
 
+	/* enable codec sysclk */
+	clk_set_rate(i2s->clk_i2s, 12000000);
+	clk_prepare_enable(i2s->clk_i2s);
+
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, JZ_AIC_CONF_RESET);
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, conf);
 
@@ -415,6 +421,11 @@ static const struct snd_soc_component_driver jz4740_i2s_component = {
 	.name		= "jz4740-i2s",
 };
 
+static const struct of_device_id jz4740_of_matches[] = {
+	{ .compatible = "ingenic,jz4740-i2s" },
+	{ /* sentinel */ }
+};
+
 static int jz4740_i2s_dev_probe(struct platform_device *pdev)
 {
 	struct jz4740_i2s *i2s;
@@ -456,6 +467,7 @@ static struct platform_driver jz4740_i2s_driver = {
 	.driver = {
 		.name = "jz4740-i2s",
 		.owner = THIS_MODULE,
+		.of_match_table = jz4740_of_matches
 	},
 };
 
