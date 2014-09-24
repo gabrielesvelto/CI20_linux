@@ -154,7 +154,8 @@ static void (* r4k_blast_dcache)(void);
 static void __cpuinit r4k_blast_dcache_setup(void)
 {
 	unsigned long dc_lsize = cpu_dcache_line_size();
-	r4k_blast_dcache_jz = blast_dcache_jz;
+	//r4k_blast_dcache_jz = blast_dcache_jz;
+	r4k_blast_dcache_jz = blast_dcache32;
 	if (dc_lsize == 0)
 		r4k_blast_dcache = (void *)cache_noop;
 	else if (dc_lsize == 16)
@@ -283,7 +284,8 @@ static void (* r4k_blast_icache)(void);
 static void __cpuinit r4k_blast_icache_setup(void)
 {
 	unsigned long ic_lsize = cpu_icache_line_size();
-	r4k_blast_icache_jz = blast_icache_jz;
+//	r4k_blast_icache_jz = blast_icache_jz;
+	r4k_blast_icache_jz = blast_icache32;
 	if (ic_lsize == 0)
 		r4k_blast_icache = (void *)cache_noop;
 	else if (ic_lsize == 16)
@@ -770,18 +772,6 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 		} else {
                         /* Flush dcache by address on this CPU */
 			protected_blast_dcache_range(start, end);
-			//if ( (end-start < PAGE_SIZE)) {
-			if ( 0 ) {
-				/* Flush dcache_range by index on other CPUs */
-				struct flush_icache_range_args range_addr;
-				range_addr.start = start;
-				range_addr.end = end;
-				r4k_on_other_cpu(protected_blast_other_cpu_dcache_range_ipi, &range_addr);
-			}
-			else {
-				/* Flush complete dcache on other CPUs */
-				r4k_on_other_cpu(local_r4k_flush_dcache_jz_ipi,0);
-			}
 		}
 	}
 
@@ -789,20 +779,21 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
                 /* Flush complete icache on all CPUs */
 		r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
 	else {
+		preempt_disable();
                 /* Flush icache by address on this CPU */
 		protected_blast_icache_range(start, end);
-		//if ( (end-start < PAGE_SIZE)) {
-		if (0) {
+		if (end-start <= PAGE_SIZE) {
 			/* Flush icache_range by index on other CPUs */
 			struct flush_icache_range_args range_addr;
 			range_addr.start = start;
 			range_addr.end = end;
-			r4k_on_other_cpu(protected_blast_other_cpu_icache_range_ipi, &range_addr);
+			smp_call_function(protected_blast_other_cpu_icache_range_ipi, &range_addr,1);
 		}
 		else {
 			/* Flush complete icache on other CPUs */
-			r4k_on_other_cpu(local_r4k_flush_icache_jz_ipi,0);
+			smp_call_function(local_r4k_flush_icache_jz_ipi,0,1);
 		}
+		preempt_enable();
         }
 }
 #endif
