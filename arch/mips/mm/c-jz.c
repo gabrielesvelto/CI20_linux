@@ -752,6 +752,15 @@ static inline void protected_blast_other_cpu_icache_range_ipi(void *args)
 	INVALIDATE_BTB();
 }
 
+/*
+ * Test result by 2013-10-25:
+ * Flush complete dcache and icache on other CPUs with local_r4k_flush_dcache_jz_ipi()
+ * and local_r4k_flush_icache_jz_ipi(), running flushtest is stable 4days.
+ *
+ * Flush dcache_range and icache_range by index on other CPUs,
+ * with protected_blast_other_cpu_dcache_range_ipi() protected_blast_other_cpu_icache_range_ipi(),
+ * fails running flushtest after hours. It should be update in the future.
+ */
 static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 {
 	if (!cpu_has_ic_fills_f_dc) {
@@ -761,7 +770,8 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 		} else {
                         /* Flush dcache by address on this CPU */
 			protected_blast_dcache_range(start, end);
-			if ( (end-start < PAGE_SIZE)) {
+			//if ( (end-start < PAGE_SIZE)) {
+			if ( 0 ) {
 				/* Flush dcache_range by index on other CPUs */
 				struct flush_icache_range_args range_addr;
 				range_addr.start = start;
@@ -781,7 +791,8 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 	else {
                 /* Flush icache by address on this CPU */
 		protected_blast_icache_range(start, end);
-		if ( (end-start < PAGE_SIZE)) {
+		//if ( (end-start < PAGE_SIZE)) {
+		if (0) {
 			/* Flush icache_range by index on other CPUs */
 			struct flush_icache_range_args range_addr;
 			range_addr.start = start;
