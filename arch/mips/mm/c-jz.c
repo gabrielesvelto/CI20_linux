@@ -57,6 +57,15 @@ static inline void r4k_on_each_cpu(void (*func) (void *info), void *info)
 	preempt_enable();
 }
 
+static inline void r4k_on_other_cpu(void (*func) (void *info), void *info)
+{
+#if !defined(CONFIG_MIPS_MT_SMP) && !defined(CONFIG_MIPS_MT_SMTC)
+	preempt_disable();
+	smp_call_function(func, info, 1);
+	preempt_enable();
+#endif
+}
+
 #if defined(CONFIG_MIPS_CMP)
 #define cpu_has_safe_index_cacheops 0
 #else
@@ -638,15 +647,15 @@ static inline void local_r4k_flush_icache_range(unsigned long start, unsigned lo
 {
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			r4k_blast_dcache_jz();
+                        r4k_blast_dcache();
 		} else {
 			R4600_HIT_CACHEOP_WAR_IMPL;
 			protected_blast_dcache_range(start, end);
 		}
 	}
 
-	if (end - start > icache_size)
-		r4k_blast_icache_jz();
+	if (end - start >= icache_size)
+		r4k_blast_icache();
 	else
 		protected_blast_icache_range(start, end);
 }
@@ -660,18 +669,25 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 {
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			//r4k_blast_dcache_jz();
-			r4k_on_each_cpu(local_r4k_flush_dcache_jz_ipi,0);
+                        /* Flush complete dcache on all CPUs */
+			r4k_on_each_cpu(local_r4k_flush_dcache_ipi,0);
 		} else {
-			R4600_HIT_CACHEOP_WAR_IMPL;
+                        /* Flush dcache by address on this CPU */
 			protected_blast_dcache_range(start, end);
+                        /* Flush complete dcache on other CPUs */
+                        r4k_on_other_cpu(local_r4k_flush_dcache_ipi,0);
 		}
 	}
 
-	if (end - start > icache_size)
-		r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
-	else
+	if (end - start >= icache_size)
+                /* Flush complete icache on all CPUs */
+		r4k_on_each_cpu(local_r4k_flush_icache_ipi,0);
+	else {
+                /* Flush icache by address on this CPU */
 		protected_blast_icache_range(start, end);
+                /* Flush complete icache on other CPUs */
+                r4k_on_other_cpu(local_r4k_flush_icache_ipi,0);
+        }
 }
 #endif
 
