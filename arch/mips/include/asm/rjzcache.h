@@ -598,6 +598,7 @@ static inline void blast_icache_jz(void)
 	unsigned long start = INDEX_BASE;
 	unsigned long end = start + current_cpu_data.icache.waysize * current_cpu_data.icache.ways;
 	unsigned long addr = start;
+
 	do {
 		i_cache(JZ_FETCH_LOCK, addr, 0);i_cache(Hit_Invalidate_I,addr,0);
 		addr += 32;
@@ -608,6 +609,29 @@ static inline void blast_icache_jz(void)
 		i_cache(JZ_FETCH_LOCK, addr, 0);i_cache(Hit_Invalidate_I,addr,0);
 		addr += 32;
 	} while (addr < end);
+
+	do {
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+	}while(start < end);
 }
 
 static inline void blast_dcache32(void)
@@ -799,7 +823,7 @@ static inline void protected_blast_icache_range(unsigned long start,
 	unsigned long aend = (end - 1) & ~(lsize - 1);
 
 	//	K0_TO_K1();
-	K0_TO_K1_CHECK(start,end);
+	//K0_TO_K1_CHECK(start,end);
 
 	while (1) {
 		protected_cache_op(Hit_Invalidate_I, addr);
@@ -809,7 +833,7 @@ static inline void protected_blast_icache_range(unsigned long start,
 	}
 	INVALIDATE_BTB();
 
-	K1_TO_K0();
+	//K1_TO_K0();
 }
 
 static inline void blast_dcache_range(unsigned long start,
