@@ -591,6 +591,8 @@ static inline void blast_dcache_jz(void)
 		}
 		start += 32;
 	}while(start < end);
+
+	//SYNC_WB();
 }
 
 static inline void blast_icache_jz(void)
@@ -632,6 +634,8 @@ static inline void blast_icache_jz(void)
 		}
 		start += 32;
 	}while(start < end);
+
+	INVALIDATE_BTB();
 }
 
 static inline void blast_dcache32(void)
