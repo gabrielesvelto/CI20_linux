@@ -713,18 +713,18 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
                         /* Flush complete dcache on all CPUs */
-			r4k_on_each_cpu(local_r4k_flush_dcache_ipi,0);
+			r4k_on_each_cpu(local_r4k_flush_dcache_jz_ipi,0);
 		} else {
                         /* Flush dcache by address on this CPU */
 			protected_blast_dcache_range(start, end);
                         /* Flush complete dcache on other CPUs */
-                        r4k_on_other_cpu(local_r4k_flush_dcache_ipi,0);
+                        //r4k_on_other_cpu(local_r4k_flush_dcache_jz_ipi,0);
 		}
 	}
 
 	if (end - start >= icache_size)
                 /* Flush complete icache on all CPUs */
-		r4k_on_each_cpu(local_r4k_flush_icache_ipi,0);
+		r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
 	else {
                 /* Flush icache by address on this CPU */
 		protected_blast_icache_range(start, end);
@@ -736,7 +736,7 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 		}
 		else {
 			/* Flush complete icache on other CPUs */
-			r4k_on_other_cpu(local_r4k_flush_icache_ipi,0);
+			r4k_on_other_cpu(local_r4k_flush_icache_jz_ipi,0);
 		}
         }
 }
