@@ -1,0 +1,22 @@
+* Ingenic JZ4740 ADC
+
+Required properties:
+- compatible: should be "ingenic,jz4740-adc"
+- reg: Should contain the address & length of registers
+- interrupts: Should specify the interrupt provided by parent.
+- clocks: Should contain a single clock specifier for the ADC clock.
+- clock-names: Should be "adc".
+
+Example:
+
+adc@0x10070000 {
+	compatible = "ingenic,jz4740-adc";
+	reg = <0x10070000 0x30>;
+
+	interrupt-parent = <&intc>;
+	interrupts = <18>;
+
+	clocks = <&cgu JZ4780_CLK_SADC>;
+	clock-names = "adc";
+};
+
