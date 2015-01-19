@@ -36,7 +36,7 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/otg.h>
-#include <asm/mach-jz4780/jz4780-cgu.h>
+#include <asm/mach-jz4740/jz4780-cgu.h>
 
 #include "ehci.h"
 
