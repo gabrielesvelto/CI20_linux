@@ -44,7 +44,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
-#include <asm/mach-jz4780/jz4780-cgu.h>
+#include <asm/mach-jz4740/jz4780-cgu.h>
 
 #include "core.h"
 #include "hcd.h"
