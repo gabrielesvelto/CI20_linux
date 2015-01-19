@@ -25,6 +25,7 @@
 #include <linux/of.h>
 #include <dt-bindings/clock/jz4780-cgu.h>
 #include "jz47xx-cgu.h"
+#include <asm/mach-jz4740/jz4780-cgu.h>
 
 /* CGU register offsets */
 #define CGU_REG_CLOCKCONTROL	0x00
@@ -744,3 +745,225 @@ static void __init jz4780_cgu_init(struct device_node *np)
 		       cgu->clocks.clks[JZ4780_CLK_MPLL]);
 }
 CLK_OF_DECLARE(jz4780_cgu, "ingenic,jz4780-cgu", jz4780_cgu_init);
+
+int jz4780_cgu_set_usb_suspend(enum jz4780_usb_port port, bool suspend)
+{
+	unsigned long flags;
+	u32 opcr, bit;
+
+	switch (port) {
+	case USB_PORT_OTG:
+		bit = OPCR_SPENDN0;
+		break;
+
+	case USB_PORT_HOST:
+		bit = OPCR_SPENDN1;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	opcr = readl(cgu->base + CGU_REG_OPCR);
+	if (suspend)
+		opcr &= ~bit;
+	else
+		opcr |= bit;
+	writel(opcr, cgu->base + CGU_REG_OPCR);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_suspend);
+
+int jz4780_cgu_set_usb_otg_mode(enum jz4780_usb_otg_mode mode)
+{
+	unsigned long flags;
+	u32 usbpcr1;
+	int retval = 0;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr1 = readl(cgu->base + CGU_REG_USBPCR1);
+
+	switch (mode) {
+	case USB_OTG_MODE_MENTOR:
+		usbpcr1 &= USBPCR1_USB_SEL;
+		break;
+
+	case USB_OTG_MODE_SYNOPSYS:
+		usbpcr1 |= USBPCR1_USB_SEL;
+		break;
+
+	default:
+		retval = -EINVAL;
+		goto out;
+	}
+
+	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
+
+out:
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+
+	return retval;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_otg_mode);
+
+int jz4780_cgu_set_usb_utmi_bus_width(enum jz4780_usb_port port,
+				      enum jz4780_usb_utmi_bus_width width)
+{
+	unsigned long flags;
+	u32 usbpcr1, bit;
+	int retval = 0;
+
+	switch (port) {
+	case USB_PORT_OTG:
+		bit = USBPCR1_WORD_IF0;
+		break;
+
+	case USB_PORT_HOST:
+		bit = USBPCR1_WORD_IF1;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr1 = readl(cgu->base + CGU_REG_USBPCR1);
+
+	switch (width) {
+	case USB_PORT_UTMI_BUS_WIDTH_8:
+		usbpcr1 &= bit;
+		break;
+
+	case USB_PORT_UTMI_BUS_WIDTH_16:
+		usbpcr1 |= bit;
+		break;
+
+	default:
+		retval = -EINVAL;
+		goto out_unlock;
+	}
+
+	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
+
+out_unlock:
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return retval;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_utmi_bus_width);
+
+void jz4780_cgu_set_usb_iddigfil(u32 value)
+{
+	unsigned long flags;
+	u32 usbvbfil;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbvbfil = readl(cgu->base + CGU_REG_USBPCR1);
+	usbvbfil &= ~USBVBFIL_IDDIGFIL_MASK;
+	usbvbfil |= value;
+	writel(usbvbfil, cgu->base + CGU_REG_USBVBFIL);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_iddigfil);
+
+void jz4780_cgu_set_usb_usbvbfil(u32 value)
+{
+	unsigned long flags;
+	u32 usbvbfil;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbvbfil = readl(cgu->base + CGU_REG_USBPCR1);
+	usbvbfil &= ~USBVBFIL_USBVBFIL_MASK;
+	usbvbfil |= value;
+	writel(usbvbfil, cgu->base + CGU_REG_USBVBFIL);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_usbvbfil);
+
+void jz4780_cgu_set_usb_usbrdt(u32 value)
+{
+	unsigned long flags;
+	u32 usbrdt;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbrdt = readl(cgu->base + CGU_REG_USBRDT);
+	usbrdt &= ~USBRDT_USBRDT_MASK;
+	usbrdt |= value;
+	writel(usbrdt, cgu->base + CGU_REG_USBRDT);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_usbrdt);
+
+void jz4780_cgu_set_usb_vbfil_ld_en(bool enable)
+{
+	unsigned long flags;
+	u32 usbrdt;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbrdt = readl(cgu->base + CGU_REG_USBRDT);
+	usbrdt &= ~USBRDT_VBFIL_LD_EN;
+	usbrdt |= (enable & USBRDT_VBFIL_LD_EN);
+	writel(usbrdt, cgu->base + CGU_REG_USBRDT);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_vbfil_ld_en);
+
+void jz4780_cgu_usb_reset(void)
+{
+	unsigned long flags;
+	u32 usbpcr;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr = readl(cgu + CGU_REG_USBPCR);
+	writel(usbpcr | USBPCR_POR, cgu + CGU_REG_USBPCR);
+
+	mdelay(1);
+	usbpcr = readl(cgu + CGU_REG_USBPCR);
+	writel(usbpcr & (~USBPCR_POR), cgu + CGU_REG_USBPCR);
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_usb_reset);
+
+int jz4780_cgu_set_usbpcr_param(u32 param, bool enable)
+{
+	unsigned long flags;
+	u32 usbpcr;
+
+	switch (param) {
+	case USBPCR_USB_MODE:
+	case USBPCR_COMMONONN:
+	case USBPCR_VBUSVLDEXT:
+	case USBPCR_VBUSVLDEXTSEL:
+	case USBPCR_OTG_DISABLE:
+	case USBPCR_TXPREEMPHTUNE:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbpcr = readl(cgu->base + CGU_REG_USBPCR);
+
+	if (enable)
+		usbpcr |= param;
+	else
+		usbpcr &= ~param;
+
+	writel(usbpcr, cgu->base + CGU_REG_USBPCR);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usbpcr_param);
