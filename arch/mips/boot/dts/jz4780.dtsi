@@ -186,6 +186,20 @@
 				};
 			};
 
+			pinfunc_uart2: uart2 {
+				pins_uart2_data: uart2-data {
+					ingenic,pins = <&gpd  6 1 &pincfg_nobias  /* rxd */
+							&gpd  7 1 &pincfg_nobias>; /* txd */
+				};
+
+				pins_uart2_dataplusflow: uart2-dataplusflow {
+					ingenic,pins = <&gpd  6 1 &pincfg_nobias  /* rxd */
+							&gpd  5 1 &pincfg_nobias   /* cts */
+							&gpd  4 1 &pincfg_nobias   /* rts */
+							&gpd  7 1 &pincfg_nobias>; /* txd */
+				};
+			};
+
 			pinfunc_uart3: uart3 {
 				pins_uart3_data: uart3-data {
 					ingenic,pins = <&gpd 12 0 &pincfg_pull_down /* rxd */
@@ -359,6 +373,8 @@
 			interrupt-parent = <&intc>;
 			interrupts = <49>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&pins_uart2_dataplusflow>;
 			clocks = <&cgu JZ4780_CLK_UART2>;
 		};
 
