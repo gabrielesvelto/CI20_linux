@@ -262,6 +262,8 @@ config MACH_JZ4780
 	select ARCH_REQUIRE_GPIOLIB
 	select SYS_HAS_EARLY_PRINTK
 	select COMMON_CLK
+	select PINCTRL
+	select PINCTRL_JZ4780
 	select GENERIC_IRQ_CHIP
 	select BUILTIN_DTB
 	select USE_OF
