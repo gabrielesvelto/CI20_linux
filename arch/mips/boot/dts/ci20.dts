@@ -45,6 +45,33 @@
 		enable-active-high;
 		regulator-always-on;
 	};
+
+	/* HACK: Keeping BT reset high. No simple driver fix */
+	bt_reset: fixedregulator@4 {
+		compatible = "regulator-fixed";
+		regulator-name = "bt_reset_gpio";
+		gpio = <&gpf 8 0>;
+		enable-active-high;
+		regulator-always-on;
+	};
+
+	/* HACK: Keeping BT_reg_on high. No simple driver fix */
+	bt_reg_on: fixedregulator@5 {
+		compatible = "regulator-fixed";
+		regulator-name = "bt_reg_on_gpio";
+		gpio = <&gpf 4 0>;
+		enable-active-high;
+		regulator-always-on;
+	};
+
+	/* HACK: Keeping BT wake high. No simple driver fix */
+	bt_wake: fixedregulator@6 {
+		compatible = "regulator-fixed";
+		regulator-name = "bt_wake_gpio";
+		gpio = <&gpf 5 0>;
+		enable-active-high;
+		regulator-always-on;
+	};
 };
 
 &ext {
