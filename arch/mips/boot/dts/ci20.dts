@@ -11,6 +11,12 @@
 		       0x30000000 0x30000000>;
 	};
 
+	audio: audio-ci20 {
+		compatible = "ingenic,ci20-audio";
+		ingenic,i2s-controller = <&i2s>;
+		ingenic,codec = <&codec>;
+	};
+
 	eth0_power: fixedregulator@0 {
 		compatible = "regulator-fixed";
 		regulator-name = "eth0_power";
