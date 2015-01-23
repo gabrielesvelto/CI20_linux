@@ -264,6 +264,7 @@ config MACH_JZ4780
 	select COMMON_CLK
 	select PINCTRL
 	select PINCTRL_JZ4780
+	select SYS_SUPPORTS_HIGHMEM
 	select GENERIC_IRQ_CHIP
 	select BUILTIN_DTB
 	select USE_OF
