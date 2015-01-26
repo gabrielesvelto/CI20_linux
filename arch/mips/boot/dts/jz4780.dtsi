@@ -540,6 +540,14 @@
 			clocks = <&cgu JZ4780_CLK_NEMC>;
 		};
 
+		efuse: efuse@134100D0 {
+			compatible = "ingenic,jz4780-efuse";
+			reg = <0x134100D0 0xFF>;
+
+			clocks = <&cgu JZ4780_CLK_AHB2>;
+			clock-names = "bus_clk";
+		};
+
 		dma: dma@13420000 {
 			compatible = "ingenic,jz4780-dma";
 			reg = <0x13420000 0x10000>;
