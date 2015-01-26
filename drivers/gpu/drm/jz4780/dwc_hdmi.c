@@ -1579,6 +1579,7 @@ void dwc_hdmi_register(struct dwc_hdmi *hdmi, struct drm_device *dev)
 {
 	struct drm_encoder *encoder = &hdmi->encoder;
 	struct drm_connector *connector = &hdmi->connector;
+	int ret;
 
 	connector->funcs = &dwc_hdmi_connector_funcs;
 	encoder->funcs = &dwc_hdmi_encoder_funcs;
@@ -1603,13 +1604,12 @@ void dwc_hdmi_register(struct dwc_hdmi *hdmi, struct drm_device *dev)
 
 	connector->encoder = encoder;
 
-	int ret = drm_connector_register(connector);
-                 if (ret) {
-                         dev_err(dev,
-                                 "[CONNECTOR:%d:%s] drm_connector_register failed: %d\n",
-                                 connector->base.id,
-                                 connector->name, ret);
-                 }
+	ret = drm_connector_register(connector);
+	if (ret) {
+		dev_err(dev->dev,
+			"[CONNECTOR:%d:%s] drm_connector_register failed: %d\n",
+			connector->base.id, connector->name, ret);
+	}
 
 	drm_mode_connector_attach_encoder(connector, encoder);
 
