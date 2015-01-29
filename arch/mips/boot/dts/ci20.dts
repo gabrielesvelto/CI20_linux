@@ -275,5 +275,5 @@
 &i2c4 {
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pins_i2c4_data>;
+	pinctrl-0 = <&pins_i2c4_data_pf>;
 };
