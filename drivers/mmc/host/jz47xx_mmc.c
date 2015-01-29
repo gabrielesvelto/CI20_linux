@@ -1008,6 +1008,8 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 	spin_lock_init(&host->lock);
 	host->irq_mask = 0xffffffff;
 
+	jz47xx_mmc_reset(host);
+
 	ret = devm_request_threaded_irq(&pdev->dev, host->irq, jz47xx_mmc_irq,
 			jz47xx_mmc_irq_worker, 0, dev_name(&pdev->dev), host);
 	if (ret) {
@@ -1015,7 +1017,6 @@ static int jz47xx_mmc_probe(struct platform_device *pdev)
 		goto err_gpio_bulk_free;
 	}
 
-	jz47xx_mmc_reset(host);
 	jz47xx_mmc_clock_disable(host);
 	setup_timer(&host->timeout_timer, jz47xx_mmc_timeout,
 			(unsigned long)host);
