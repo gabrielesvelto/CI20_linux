@@ -357,9 +357,14 @@
 			};
 
 			pinfunc_i2c4: i2c4 {
-				pins_i2c4_data: i2c4-data{
+				pins_i2c4_data: i2c4-data-pe{
 					ingenic,pins = <&gpe  12 1 &pincfg_nobias  /* sda */
 							&gpe  13 1 &pincfg_nobias>; /* sck */
+				};
+
+				pins_i2c4_data_pf: i2c4-data-pf{
+					ingenic,pins = <&gpf 25 1 &pincfg_nobias /* hdmi_sda */
+							&gpf 24 1 &pincfg_nobias>; /* hdmi_sck */
 				};
 			};
 		};
