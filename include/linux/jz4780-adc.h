@@ -3,6 +3,10 @@
 
 #include <linux/device.h>
 
+#define JZ_ADC_CONFIG_CMD_MASK	0x3
+#define JZ_ADC_CONFIG_AUX1_EN	0x1
+#define JZ_ADC_CONFIG_AUX2_EN	0x2
+
 /*
  * jz_adc_set_config - Configure a JZ4780 adc device
  * @dev: Pointer to a jz4780-adc device

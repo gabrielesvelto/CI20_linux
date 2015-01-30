@@ -25,6 +25,11 @@
 #include <linux/mfd/core.h>
 
 #include <linux/hwmon.h>
+#include <linux/hwmon-sysfs.h>
+
+#ifdef CONFIG_SOC_4780
+#include <linux/jz4780-adc.h>
+#endif
 
 struct jz4740_hwmon {
 	struct resource *mem;
@@ -59,6 +64,8 @@ static ssize_t jz4740_hwmon_read_adcin(struct device *dev,
 {
 	struct jz4740_hwmon *hwmon = dev_get_drvdata(dev);
 	struct completion *completion = &hwmon->read_completion;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(dev_attr);
+	unsigned int channel = 1;
 	unsigned long t;
 	unsigned long val;
 	int ret;
@@ -69,6 +76,17 @@ static ssize_t jz4740_hwmon_read_adcin(struct device *dev,
 
 	enable_irq(hwmon->irq);
 	hwmon->cell->enable(to_platform_device(dev));
+#ifdef CONFIG_SOC_4780
+	switch(attr->index) {
+		case 1: channel = JZ_ADC_CONFIG_AUX1_EN;
+			break;
+		case 2: channel = JZ_ADC_CONFIG_AUX2_EN;
+			break;
+		default: dev_err(dev, "invalid channel attribute");
+	}
+
+	jz_adc_set_config(dev->parent, JZ_ADC_CONFIG_CMD_MASK , channel);
+#endif
 
 	t = wait_for_completion_interruptible_timeout(completion, HZ);
 
@@ -89,11 +107,17 @@ static ssize_t jz4740_hwmon_read_adcin(struct device *dev,
 }
 
 static DEVICE_ATTR(name, S_IRUGO, jz4740_hwmon_show_name, NULL);
-static DEVICE_ATTR(in0_input, S_IRUGO, jz4740_hwmon_read_adcin, NULL);
+static SENSOR_DEVICE_ATTR(in0_input, S_IRUGO, jz4740_hwmon_read_adcin, NULL , 1);
+#ifdef CONFIG_SOC_4780
+static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, jz4740_hwmon_read_adcin, NULL , 2);
+#endif
 
 static struct attribute *jz4740_hwmon_attributes[] = {
 	&dev_attr_name.attr,
-	&dev_attr_in0_input.attr,
+	&sensor_dev_attr_in0_input.dev_attr.attr,
+#ifdef CONFIG_SOC_4780
+	&sensor_dev_attr_in1_input.dev_attr.attr,
+#endif
 	NULL
 };
 

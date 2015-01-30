@@ -357,6 +357,11 @@ static int __init ci20_board_init(void)
 	platform_device_register(&jz_ipu1_device);
 #endif
 
+/* adc */
+#ifdef CONFIG_SENSORS_JZ4740
+	platform_device_register(&jz_adc_device);
+#endif
+
 /* mmc */
 #ifdef CONFIG_MMC0_JZ4780
 	jz_device_register(&jz_msc0_device, &ci20_tf_pdata);

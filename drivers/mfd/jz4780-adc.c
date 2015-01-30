@@ -258,7 +258,7 @@ static struct resource jz_battery_resources[] = {
 static struct mfd_cell jz_adc_cells[] = {
 	{
 		.id = 0,
-		.name = "jz4780-hwmon",
+		.name = "jz4740-hwmon",
 		.num_resources = ARRAY_SIZE(jz_hwmon_resources),
 		.resources = jz_hwmon_resources,
 
