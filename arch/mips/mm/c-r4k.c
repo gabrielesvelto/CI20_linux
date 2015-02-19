@@ -1278,6 +1278,14 @@ static void probe_pcache(void)
 			c->dcache.flags |= MIPS_CACHE_ALIASES;
 	}
 
+#ifdef  CONFIG_HIGHMEM
+	if (((c->dcache.flags & MIPS_CACHE_ALIASES) &&
+	     ((c->dcache.waysize / PAGE_SIZE) > FIX_N_COLOURS)) ||
+	     ((c->icache.flags & MIPS_CACHE_ALIASES) &&
+	     ((c->icache.waysize / PAGE_SIZE) > FIX_N_COLOURS)))
+		panic("PAGE_SIZE*WAYS too small for L1 size, too many colors");
+#endif
+
 	switch (current_cpu_type()) {
 	case CPU_20KC:
 		/*

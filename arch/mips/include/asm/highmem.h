@@ -36,10 +36,43 @@ extern pte_t *pkmap_page_table;
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
+
+/*  8 colors pages are here */
+#ifdef  CONFIG_PAGE_SIZE_4KB
+#define LAST_PKMAP 4096
+#endif
+#ifdef  CONFIG_PAGE_SIZE_8KB
+#define LAST_PKMAP 2048
+#endif
+#ifdef  CONFIG_PAGE_SIZE_16KB
 #define LAST_PKMAP 1024
+#endif
+
+/* 32KB and 64KB pages should have 4 and 2 colors to keep space under control */
+#ifndef LAST_PKMAP
+#define LAST_PKMAP 1024
+#endif
+
 #define LAST_PKMAP_MASK (LAST_PKMAP-1)
 #define PKMAP_NR(virt)	((virt-PKMAP_BASE) >> PAGE_SHIFT)
 #define PKMAP_ADDR(nr)	(PKMAP_BASE + ((nr) << PAGE_SHIFT))
+
+#define     get_pkmap_color(pg) (((unsigned long)lowmem_page_address(pg) >> PAGE_SHIFT) & (FIX_N_COLOURS-1))
+#define     get_last_pkmap_nr(cl)     (last_pkmap_nr_arr[cl])
+#define     get_next_pkmap_nr(cl)     (last_pkmap_nr_arr[cl] = \
+					    ((get_last_pkmap_nr(cl) + FIX_N_COLOURS) & LAST_PKMAP_MASK))
+#define     no_more_pkmaps(p,cl)     (p < FIX_N_COLOURS)
+#define     get_pkmap_entries_count(c)    (c - FIX_N_COLOURS)
+
+static inline wait_queue_head_t *get_pkmap_wait_queue_head(unsigned int color)
+{
+	static DECLARE_WAIT_QUEUE_HEAD(pkmap_map_wait);
+
+	return &pkmap_map_wait;
+}
+
+extern unsigned int     last_pkmap_nr_arr[];
+
 
 extern void * kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);
