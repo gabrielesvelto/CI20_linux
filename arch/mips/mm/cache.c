@@ -19,6 +19,7 @@
 #include <asm/processor.h>
 #include <asm/cpu.h>
 #include <asm/cpu-features.h>
+#include <linux/highmem.h>
 
 /* Cache operations. */
 void (*flush_cache_all)(void);
@@ -105,48 +106,47 @@ void __flush_anon_page(struct page *page, unsigned long vmaddr)
 {
 	unsigned long addr = (unsigned long) page_address(page);
 
-	if (pages_do_alias(addr, vmaddr)) {
+	if (pages_do_alias(addr, vmaddr & PAGE_MASK)) {
 		if (page_mapped(page) && !Page_dcache_dirty(page)) {
 			void *kaddr;
 
 			kaddr = kmap_coherent(page, vmaddr);
 			flush_data_cache_page((unsigned long)kaddr);
 			kunmap_coherent();
-		} else
-			flush_data_cache_page(addr);
+		} else {
+			void *kaddr;
+
+			kaddr = kmap_atomic(page);
+			flush_data_cache_page((unsigned long)kaddr);
+			kunmap_atomic(kaddr);
+			ClearPageDcacheDirty(page);
+		}
 	}
 }
 
 EXPORT_SYMBOL(__flush_anon_page);
 
-static void mips_flush_dcache_from_pte(pte_t pteval, unsigned long address)
+void __update_cache(struct vm_area_struct *vma, unsigned long address,
+	pte_t pte)
 {
 	struct page *page;
-	unsigned long pfn = pte_pfn(pteval);
+	unsigned long pfn = pte_pfn(pte);
+	int exec = (vma->vm_flags & VM_EXEC) && !cpu_has_ic_fills_f_dc;
 
-	if (unlikely(!pfn_valid(pfn)))
+	if (unlikely(!pfn_valid(pfn))) {
+		wmb();
 		return;
-
-	page = pfn_to_page(pfn);
-	if (page_mapping(page) && Page_dcache_dirty(page)) {
-		unsigned long page_addr = (unsigned long) page_address(page);
-
-		if (!cpu_has_ic_fills_f_dc ||
-		    pages_do_alias(page_addr, address & PAGE_MASK))
-			flush_data_cache_page(page_addr);
-		ClearPageDcacheDirty(page);
 	}
-}
-
-void set_pte_at(struct mm_struct *mm, unsigned long addr,
-        pte_t *ptep, pte_t pteval)
-{
-        if (cpu_has_dc_aliases || !cpu_has_ic_fills_f_dc) {
-                if (pte_present(pteval))
-                        mips_flush_dcache_from_pte(pteval, addr);
-        }
-
-        set_pte(ptep, pteval);
+	page = pfn_to_page(pfn);
+	if (page_mapped(page) && Page_dcache_dirty(page)) {
+		unsigned long page_addr = (unsigned long) page_address(page);
+		if (exec || (cpu_has_dc_aliases &&
+		    pages_do_alias(page_addr, address & PAGE_MASK))) {
+			flush_data_cache_page(page_addr);
+			ClearPageDcacheDirty(page);
+		}
+	}
+	wmb();  /* finish any outstanding arch cache flushes before ret to user */
 }
 
 unsigned long _page_cachable_default;
