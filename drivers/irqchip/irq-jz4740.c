@@ -28,6 +28,8 @@
 #include <linux/seq_file.h>
 
 #include <asm/io.h>
+#include <asm/mipsregs.h>
+#include <asm/mach-jz4740/jz4780-smp.h>
 
 #include "irqchip.h"
 
@@ -41,6 +43,25 @@ static unsigned jz_num_chips;
 #define JZ_REG_INTC_PENDING	0x10
 #define CHIP_SIZE		0x20
 #define IRQ_BASE		8
+
+asmlinkage void plat_irq_dispatch(void)
+{
+	uint32_t pending = read_c0_cause() & read_c0_status() & CAUSEF_IP;
+	if (pending & CAUSEF_IP4) {
+		/* from OS timer */
+		do_IRQ(4);
+#ifdef CONFIG_SMP
+	} else if (pending & CAUSEF_IP3) {
+		/* from a mailbox write */
+		do_IRQ(3);
+#endif
+	} else if (pending & CAUSEF_IP2) {
+		/* from interrupt controller */
+		do_IRQ(2);
+	} else {
+		spurious_interrupt();
+	}
+}
 
 static irqreturn_t jz4740_cascade(int irq, void *data)
 {
