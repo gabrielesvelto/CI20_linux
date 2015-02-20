@@ -22,6 +22,7 @@
 
 #include <asm/bootinfo.h>
 #include <asm/mach-jz4740/base.h>
+#include <asm/mach-jz4740/jz4780-smp.h>
 
 static __init void jz4740_init_cmdline(int argc, char *argv[])
 {
@@ -48,6 +49,11 @@ void __init prom_init(void)
 {
 	jz4740_init_cmdline((int)fw_arg0, (char **)fw_arg1);
 	mips_machtype = MACH_INGENIC_JZ4740;
+#ifdef CONFIG_MACH_JZ4780
+#ifdef CONFIG_SMP
+	jz4780_smp_init();
+#endif
+#endif
 }
 
 void __init prom_free_prom_memory(void)
