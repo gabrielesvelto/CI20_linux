@@ -83,7 +83,11 @@ arch_initcall(populate_machine);
 
 const char *get_system_type(void)
 {
+#ifdef CONFIG_MACH_JZ4780
+	return "JZ4780";
+#else
 	return "JZ4740";
+#endif
 }
 
 void __init arch_init_irq(void)
