@@ -81,8 +81,15 @@ static struct irqaction mbox_action = {
 static void jz4780_smp_setup(void)
 {
 	u32 addr, reim;
+	int cpu;
 
 	reim = read_c0_reim();
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		__cpu_number_map[cpu] = cpu;
+		__cpu_logical_map[cpu] = cpu;
+		set_cpu_possible(cpu, true);
+	}
 
 	/* mask mailbox interrupts for this core */
 	reim &= ~REIM_MBOXIRQ0M;
@@ -120,9 +127,6 @@ static void jz4780_smp_prepare_cpus(unsigned int max_cpus)
 	ctrl = read_c0_corectrl();
 
 	for (cpu = 0; cpu < max_cpus; cpu++) {
-		__cpu_number_map[cpu] = cpu;
-		__cpu_logical_map[cpu] = cpu;
-
 		/* use reset entry point from REIM register */
 		ctrl |= CORECTRL_RPC0 << cpu;
 	}
