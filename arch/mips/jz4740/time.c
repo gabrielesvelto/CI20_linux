@@ -121,6 +121,11 @@ void __init plat_time_init(void)
 	of_clk_init(NULL);
 	jz4740_timer_init();
 
+#ifdef CONFIG_MACH_JZ4780
+	clocksource_of_init();
+	return;
+#endif
+
 	ext_clk = clk_get(NULL, "ext");
 	if (IS_ERR(ext_clk))
 		panic("unable to get ext clock");
