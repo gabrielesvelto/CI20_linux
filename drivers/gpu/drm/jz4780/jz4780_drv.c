@@ -282,6 +282,7 @@ static struct drm_driver jz4780_driver = {
 	.unload             = jz4780_unload,
 	.preclose           = jz4780_preclose,
 	.lastclose          = jz4780_lastclose,
+	.set_busid          = drm_platform_set_busid,
 	.irq_handler        = jz4780_irq,
 	.get_vblank_counter = drm_vblank_count,
 	.enable_vblank      = jz4780_enable_vblank,
