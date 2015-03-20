@@ -25,6 +25,16 @@
 #define	SWITCH_DEBUG(format, ...) do{ } while(0)
 #endif
 
+#ifdef CONFIG_SND_JZ4780_SOC_CI20
+int ci20_hp_jack_status_check(void);
+
+static void ci20_hp_jack_status_check_wrapper(struct work_struct *unused)
+{
+    ci20_hp_jack_status_check();
+}
+
+static DECLARE_DELAYED_WORK(ci20_hp_jack_status_check_work, ci20_hp_jack_status_check_wrapper);
+#endif
 
 static void snd_switch_set_state(struct snd_switch_data *switch_data, int state)
 {
@@ -125,6 +135,11 @@ static void snd_switch_work(struct work_struct *hp_work)
 	}
     SWITCH_DEBUG("%s,%d,%d\n",__func__,__LINE__,state);
 	snd_switch_set_state(switch_data, state);
+
+#ifdef CONFIG_SND_JZ4780_SOC_CI20
+    schedule_delayed_work(&ci20_hp_jack_status_check_work, msecs_to_jiffies(500));
+#endif
+
 }
 static void hook_do_work(struct work_struct *hook_work)
 {

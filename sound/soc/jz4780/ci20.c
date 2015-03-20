@@ -43,7 +43,7 @@ static struct snd_soc_jack_pin ci20_hp_jack_pins[] = {
 	},
 };
 
-static int ci20_hp_jack_status_check(void)
+int ci20_hp_jack_status_check(void)
 {
 	int enable;
 
@@ -152,8 +152,10 @@ static int ci20_init(struct snd_soc_pcm_runtime *rtd)
 			&ci20_hp_jack);
 	snd_soc_jack_add_pins(&ci20_hp_jack, ARRAY_SIZE(ci20_hp_jack_pins),
 			ci20_hp_jack_pins);
-	snd_soc_jack_add_gpios(&ci20_hp_jack, 1, &ci20_hp_jack_gpio);
 
+#ifndef CONFIG_SOUND_XBURST_DETECT
+	snd_soc_jack_add_gpios(&ci20_hp_jack, 1, &ci20_hp_jack_gpio);
+#endif
 	snd_soc_dapm_nc_pin(dapm, "AIP1");
 	snd_soc_dapm_nc_pin(dapm, "AIP3");
 	snd_soc_dapm_force_enable_pin(dapm, "Mic Bias");
@@ -224,7 +226,9 @@ module_init(ci20_audio_init);
 
 static void __exit ci20_audio_exit(void)
 {
+#ifndef CONFIG_SOUND_XBURST_DETECT
 	snd_soc_jack_free_gpios(&ci20_hp_jack, 1, &ci20_hp_jack_gpio);
+#endif
 	platform_device_unregister(ci20_audio_device);
 	gpio_free(GPIO_MIC_SW_EN);
 	gpio_free(GPIO_HP_MUTE);
