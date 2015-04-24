@@ -18,6 +18,7 @@
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
+#include <linux/irqchip/ingenic.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/timex.h>
@@ -31,7 +32,7 @@
 #include <asm/mipsregs.h>
 #include <asm/mach-jz4740/jz4780-smp.h>
 
-#include "../../drivers/irqchip/irqchip.h"
+#include "irqchip.h"
 
 static void __iomem *jz_intc_base;
 static unsigned jz_num_chips;

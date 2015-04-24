@@ -125,3 +125,8 @@ config KEYSTONE_IRQ
 	help
 		Support for Texas Instruments Keystone 2 IRQ controller IP which
 		is part of the Keystone 2 IPC mechanism
+
+config INGENIC_IRQ
+	bool
+	depends on MACH_JZ4780
+	default y
