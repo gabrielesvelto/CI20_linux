@@ -86,6 +86,16 @@ static struct gpio_keys_button board_buttons[] = {
 		.active_low	= ACTIVE_LOW_VOLUMEUP,
 	},
 #endif
+#ifdef GPIO_POWER_BUTTON
+        {
+                .gpio           = GPIO_POWER_BUTTON,
+                .type           = EV_KEY,
+                .code           = KEY_POWER,
+                .desc           = "power key",
+                .active_low     = 1,
+                .wakeup         = 1,
+         },
+#endif
 };
 static struct gpio_keys_platform_data board_button_data = {
 	.buttons	= board_buttons,

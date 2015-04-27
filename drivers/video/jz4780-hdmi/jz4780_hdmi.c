@@ -491,7 +491,7 @@ static long jzhdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined CONFIG_HAS_EARLYSUSPEND && !defined CONFIG_ANDROID
 static void hdmi_early_suspend(struct early_suspend *h)
 {
 	int api_mHpd = FALSE;
@@ -709,7 +709,7 @@ static int __devinit jzhdmi_probe(struct platform_device *pdev)
 		}
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined CONFIG_HAS_EARLYSUSPEND && !defined CONFIG_ANDROID
 	jzhdmi->early_suspend.suspend = hdmi_early_suspend;
 	jzhdmi->early_suspend.resume =  hdmi_late_resume;
 	jzhdmi->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 15;

@@ -97,7 +97,7 @@ extern struct snd_codec_data codec_data;
 //#define GPIO_VOLUMEUP			GPIO_PD(18)
 //#define ACTIVE_LOW_VOLUMEUP		0
 
-//#define GPIO_VOLUMEDOWN			GPIO_PD(17)
+#define GPIO_POWER_BUTTON		GPIO_PD(17)
 //#define ACTIVE_LOW_VOLUMEDOWN		1
 
 #ifdef CONFIG_OV5640
