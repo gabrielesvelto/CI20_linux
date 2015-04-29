@@ -31,7 +31,7 @@
 #include <asm/mipsregs.h>
 #include <asm/mach-jz4740/jz4780-smp.h>
 
-#include "irqchip.h"
+#include "../../drivers/irqchip/irqchip.h"
 
 static void __iomem *jz_intc_base;
 static unsigned jz_num_chips;
