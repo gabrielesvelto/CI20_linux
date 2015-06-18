@@ -60,6 +60,17 @@
 		#clock-cells = <1>;
 	};
 
+	gpu: jz4780-sgx@13040000 {
+		compatible = "ingenic,jz4780-sgx";
+		reg = <0x13040000 0x4000>;
+
+		clocks = <&cgu JZ4780_CLK_GPU>;
+		clock-names = "gpu";
+
+		interrupt-parent = <&intc>;
+		interrupts = <63>;
+	};
+
 	apb {
 		compatible = "simple-bus";
 		#address-cells = <1>;
