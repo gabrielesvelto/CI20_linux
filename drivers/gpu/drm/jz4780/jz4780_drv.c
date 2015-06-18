@@ -262,6 +262,15 @@ static void jz4780_disable_vblank(struct drm_device *dev, int crtc)
 	enable_vblank(dev, false);
 }
 
+static struct dma_buf *jz4780_drm_gem_prime_export(struct drm_device *dev,
+                        struct drm_gem_object *obj,
+                        int flags)
+{
+	/* Read/write access required */
+	flags |= O_RDWR;
+	return drm_gem_prime_export(dev, obj, flags);
+}
+
 static const struct file_operations fops = {
 	.owner              = THIS_MODULE,
 	.open               = drm_open,
@@ -277,7 +286,8 @@ static const struct file_operations fops = {
 };
 
 static struct drm_driver jz4780_driver = {
-	.driver_features    = DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET,
+	.driver_features    = DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET |
+				DRIVER_PRIME,
 	.load               = jz4780_load,
 	.unload             = jz4780_unload,
 	.preclose           = jz4780_preclose,
@@ -292,6 +302,15 @@ static struct drm_driver jz4780_driver = {
 	.dumb_create        = drm_gem_cma_dumb_create,
 	.dumb_map_offset    = drm_gem_cma_dumb_map_offset,
 	.dumb_destroy       = drm_gem_dumb_destroy,
+	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+	.gem_prime_import   = drm_gem_prime_import,
+	.gem_prime_export   = jz4780_drm_gem_prime_export,
+	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+	.gem_prime_vmap     = drm_gem_cma_prime_vmap,
+	.gem_prime_vunmap   = drm_gem_cma_prime_vunmap,
+	.gem_prime_mmap     = drm_gem_cma_prime_mmap,
 	.fops               = &fops,
 	.name               = "jz4780",
 	.desc               = "Ingenic LCD Controller DRM",
