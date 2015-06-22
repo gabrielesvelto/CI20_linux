@@ -49,7 +49,8 @@
 #include "core.h"
 #include "hcd.h"
 
-#define USBRESET_DETECT_TIME 0x96
+#define USBRESET_DETECT_TIME	0x96
+#define OTG_REG_GUSBCFG		0xb3500000
 
 static const char dwc2_driver_name[] = "dwc2-jz4780";
 
@@ -137,6 +138,7 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	struct resource *res;
 	int retval;
 	int irq;
+	u32 reg;
 	struct clk *clk_otg_phy, *clk_otg1;
 
 	if (usb_disabled())
@@ -280,6 +282,10 @@ static int dwc2_driver_probe(struct platform_device *dev)
 			retval);
 		goto err;
 	}
+
+	/* Switch off VBUS overcurrent detection in OTG PHY. */
+	reg = readl((unsigned int __iomem *)OTG_REG_GUSBCFG);
+	writel(reg | 0xc, (unsigned int __iomem *)OTG_REG_GUSBCFG);
 
 	retval = dwc2_hcd_init(hsotg, irq, params);
 	if (retval)
