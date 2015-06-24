@@ -505,6 +505,20 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};
+
+		lpcr: lcr@0x10000004 {
+			compatible = "ingenic,jz4780-lcr";
+			reg = <0x10000004 0x4>;
+
+			regulators {
+				vpu_power: VPU {
+				};
+				gpu_power: GPU {
+				};
+				gps_power: GPS {
+				};
+			};
+		};
 	};
 
 	ahb2 {
