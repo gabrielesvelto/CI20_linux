@@ -1,0 +1,30 @@
+Ingenic JZ4780 SoC Low power Control Register regulator driver
+
+Required properties:
+- compatible: "ingenic,jz4780-lcr"
+- reg: LCR register address
+- regulators: A node that houses a sub-node for each regulator controled by the
+  register. Each sub-node is identified using the node's name (or the deprecated
+  regulator-compatible property if present), with valid values listed below.
+  The content of each sub-node is defined by the standard binding for
+  regulators; see regulator.txt.
+
+The valid names for regulators are:
+
+  SCPU, VGU, GPU, GPS
+
+Example:
+
+	lpcr: lcr@0x10000004 {
+		compatible = "ingenic,jz4780-lcr";
+		reg = <0x10000004 0x4>;
+		
+		regulators {
+			vpu_power: VPU {
+			};
+			gpu_power: GPU {
+			};
+			gps_power: GPS {
+			};
+		};
+	};
