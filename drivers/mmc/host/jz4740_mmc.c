@@ -401,6 +401,7 @@ static void jz4740_mmc_set_irq_enabled(struct jz4740_mmc_host *host,
 	unsigned long flags;
 
 	spin_lock_irqsave(&host->lock, flags);
+
 	if (enabled)
 		host->irq_mask &= ~irq;
 	else
