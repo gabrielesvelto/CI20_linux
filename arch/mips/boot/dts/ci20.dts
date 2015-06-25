@@ -5,6 +5,17 @@
 / {
 	compatible = "imgtec,ci20", "ingenic,jz4780";
 
+	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
+		serial3 = &uart3;
+		serial4 = &uart4;
+	};
+
+	chosen {
+		stdout-path = &uart4;
+	};
+
 	memory {
 		device_type = "memory";
 		reg = <0x0 0x10000000
