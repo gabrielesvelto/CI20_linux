@@ -859,29 +859,25 @@ static irqreturn_t DeviceISRWrapper(int irq, void *dev_id
 #endif
         )
 {
-    PVRSRV_DEVICE_NODE *psDeviceNode;
+    PVRSRV_DEVICE_NODE *psDeviceNode = (PVRSRV_DEVICE_NODE*)dev_id;
+    SYS_DATA *psSysData = psDeviceNode->psSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
     IMG_BOOL bStatus = IMG_FALSE;
 
     PVR_UNREFERENCED_PARAMETER(irq);
-
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
     PVR_UNREFERENCED_PARAMETER(regs);
 #endif	
-    psDeviceNode = (PVRSRV_DEVICE_NODE*)dev_id;
-    if(!psDeviceNode)
+
+    if (psEnvData->bLISRInstalled)
     {
-        PVR_DPF((PVR_DBG_ERROR, "DeviceISRWrapper: invalid params\n"));
-        goto out;
+        bStatus = PVRSRVDeviceLISR(psDeviceNode);
+        if (bStatus)
+        {
+	    OSScheduleMISR((IMG_VOID *)psSysData);
+        }
     }
 
-    bStatus = PVRSRVDeviceLISR(psDeviceNode);
-
-    if (bStatus)
-    {
-		OSScheduleMISR((IMG_VOID *)psDeviceNode->psSysData);
-    }
-
-out:
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
     return bStatus ? IRQ_HANDLED : IRQ_NONE;
 #endif
@@ -908,7 +904,8 @@ static irqreturn_t SystemISRWrapper(int irq, void *dev_id
 #endif
         )
 {
-    SYS_DATA *psSysData;
+    SYS_DATA *psSysData = (SYS_DATA *)dev_id;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
     IMG_BOOL bStatus = IMG_FALSE;
 
     PVR_UNREFERENCED_PARAMETER(irq);
@@ -916,21 +913,16 @@ static irqreturn_t SystemISRWrapper(int irq, void *dev_id
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
     PVR_UNREFERENCED_PARAMETER(regs);
 #endif
-    psSysData = (SYS_DATA *)dev_id;
-    if(!psSysData)
+
+    if (psEnvData->bLISRInstalled)
     {
-        PVR_DPF((PVR_DBG_ERROR, "SystemISRWrapper: invalid params\n"));
-        goto out;
+        bStatus = PVRSRVSystemLISR(psSysData);
+        if (bStatus)
+        {
+            OSScheduleMISR((IMG_VOID *)psSysData);
+        }
     }
 
-    bStatus = PVRSRVSystemLISR(psSysData);
-
-    if (bStatus)
-    {
-        OSScheduleMISR((IMG_VOID *)psSysData);
-    }
-
-out:
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
     return bStatus ? IRQ_HANDLED : IRQ_NONE;
 #endif
@@ -1011,9 +1003,9 @@ PVRSRV_ERROR OSUninstallDeviceLISR(IMG_VOID *pvSysData)
         
     PVR_TRACE(("Uninstalling device LISR on IRQ %d with cookie %p", psEnvData->ui32IRQ,  psEnvData->pvISRCookie));
 
-    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
-
     psEnvData->bLISRInstalled = IMG_FALSE;
+
+    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
 
     return PVRSRV_OK;
 }
@@ -1091,9 +1083,9 @@ PVRSRV_ERROR OSUninstallSystemLISR(IMG_VOID *pvSysData)
 
     PVR_TRACE(("Uninstalling system LISR on IRQ %d with cookie %p", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
 
-    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
-
     psEnvData->bLISRInstalled = IMG_FALSE;
+
+    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
 
     return PVRSRV_OK;
 }

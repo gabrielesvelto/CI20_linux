@@ -307,8 +307,7 @@ static IMG_VOID DumpPT(MMU_PT_INFO *psPTInfoList)
 	/* 1024 entries in a 4K page table */
 	for(i = 0; i < 1024; i += 8)
 	{
-		PVR_DPF((PVR_DBG_ERROR,
-				 "%08X %08X %08X %08X %08X %08X %08X %08X\n",
+		PVR_LOG(("%08X %08X %08X %08X %08X %08X %08X %08X",
 				 p[i + 0], p[i + 1], p[i + 2], p[i + 3],
 				 p[i + 4], p[i + 5], p[i + 6], p[i + 7]));
 	}
@@ -333,7 +332,7 @@ static IMG_VOID CheckPT(MMU_PT_INFO *psPTInfoList)
 
 	if(psPTInfoList->ui32ValidPTECount != ui32Count)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "ui32ValidPTECount: %u ui32Count: %u\n",
+		PVR_DPF((PVR_DBG_ERROR, "ui32ValidPTECount: %u ui32Count: %u",
 				 psPTInfoList->ui32ValidPTECount, ui32Count));
 		DumpPT(psPTInfoList);
 		PVR_DBG_BREAK;

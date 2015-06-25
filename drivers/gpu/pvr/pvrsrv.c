@@ -1015,18 +1015,23 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 		/* For the Emulator we want the system to stop when a lock-up is detected so the state can be analysed.
 		 * Also the Emulator is much slower than real silicon so timeouts are not valid. 
 		 */
+		if((*pui32LinMemAddr & ui32Mask) == ui32Value)
+		{
+			return PVRSRV_OK;
+		}
+
 		do
 		{
-			if((*pui32LinMemAddr & ui32Mask) == ui32Value)
-			{
-				return PVRSRV_OK;
-			}
-
 			#if defined(__linux__)
 			OSWaitus(ui32PollPeriodus);
 			#else
 			OSReleaseThreadQuanta();
 			#endif	
+
+			if((*pui32LinMemAddr & ui32Mask) == ui32Value)
+			{
+				return PVRSRV_OK;
+			}
 
 		} while (ui32Timeoutus); /* Endless loop only for the Emulator */
 	}
@@ -1039,15 +1044,15 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 			PVR_ASSERT(ui32PollPeriodus >= 1000);
 		}
 
+		ui32ActualValue = (*pui32LinMemAddr & ui32Mask);
+		if(ui32ActualValue == ui32Value)
+		{
+			return PVRSRV_OK;
+		}
+
 		/* PRQA S 3415,4109 1 */ /* macro format critical - leave alone */
 		LOOP_UNTIL_TIMEOUT(ui32Timeoutus)
 		{
-			ui32ActualValue = (*pui32LinMemAddr & ui32Mask);
-			if(ui32ActualValue == ui32Value)
-			{
-				return PVRSRV_OK;
-			}
-			
 			if (bAllowPreemption)
 			{
 				OSSleepms(ui32PollPeriodus / 1000);
@@ -1056,6 +1061,13 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 			{
 				OSWaitus(ui32PollPeriodus);
 			}
+
+			ui32ActualValue = (*pui32LinMemAddr & ui32Mask);
+			if(ui32ActualValue == ui32Value)
+			{
+				return PVRSRV_OK;
+			}
+
 		} END_LOOP_UNTIL_TIMEOUT();
 	
 		PVR_DPF((PVR_DBG_ERROR,"PollForValueKM: Timeout. Expected 0x%x but found 0x%x (mask 0x%x).",
