@@ -333,7 +333,7 @@ static struct dma_async_tx_descriptor *jz4780_dma_prep_slave_sg(
 static struct dma_async_tx_descriptor *jz4780_dma_prep_dma_cyclic(
 	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
 	size_t period_len, enum dma_transfer_direction direction,
-	unsigned long flags, void *context)
+	unsigned long flags)
 {
 	struct jz4780_dma_chan *jzchan = to_jz4780_dma_chan(chan);
 	struct jz4780_dma_desc *desc;
