@@ -46,6 +46,11 @@
 
 #include "dm9000.h"
 
+#ifdef CONFIG_JZ4780_CI20
+static char *mac_addr = NULL;
+module_param(mac_addr, charp, 0);
+#endif
+
 /* Board/System/Debug information/definition ---------------- */
 
 #define DM9000_PHY		0x40	/* PHY address 0x01 */
@@ -1434,6 +1439,10 @@ dm9000_probe(struct platform_device *pdev)
 	int reset_gpios;
 	enum of_gpio_flags flags;
 	struct regulator *power;
+#ifdef CONFIG_JZ4780_CI20
+	u8 eth_addr[6];
+	ssize_t sz = 0;
+#endif
 
 	power = devm_regulator_get(dev, "vcc");
 	if (IS_ERR(power)) {
@@ -1668,20 +1677,34 @@ dm9000_probe(struct platform_device *pdev)
 	db->mii.mdio_read    = dm9000_phy_read;
 	db->mii.mdio_write   = dm9000_phy_write;
 
-	mac_src = "eeprom";
+#ifdef CONFIG_JZ4780_CI20
+	mac_src = "bootarg";
+	if (mac_addr)
+		sz = sscanf(mac_addr, "%2x:%2x:%2x:%2x:%2x:%2x",
+				(unsigned int *)eth_addr,
+				(unsigned int *)(eth_addr + 1),
+				(unsigned int *)(eth_addr + 2),
+				(unsigned int *)(eth_addr + 3),
+				(unsigned int *)(eth_addr + 4),
+				(unsigned int *)(eth_addr + 5));
+	if (sz == ETH_ALEN)
+		ether_addr_copy(ndev->dev_addr, eth_addr);
+#endif
 
-	/* try reading the node address from the attached EEPROM */
-	for (i = 0; i < 6; i += 2)
-		dm9000_read_eeprom(db, i / 2, ndev->dev_addr+i);
+	if (!is_valid_ether_addr(ndev->dev_addr)) {
+		/* try reading the node address from the attached EEPROM */
+		mac_src = "eeprom";
+		for (i = 0; i < 6; i += 2)
+			dm9000_read_eeprom(db, i / 2, ndev->dev_addr+i);
+	}
 
 	if (!is_valid_ether_addr(ndev->dev_addr) && pdata != NULL) {
 		mac_src = "platform data";
-		memcpy(ndev->dev_addr, pdata->dev_addr, ETH_ALEN);
+		ether_addr_copy(ndev->dev_addr, pdata->dev_addr);
 	}
 
 	if (!is_valid_ether_addr(ndev->dev_addr)) {
 		/* try reading from mac */
-
 		mac_src = "chip";
 		for (i = 0; i < 6; i++)
 			ndev->dev_addr[i] = ior(db, i+DM9000_PAR);
@@ -1694,7 +1717,6 @@ dm9000_probe(struct platform_device *pdev)
 		eth_hw_addr_random(ndev);
 		mac_src = "random";
 	}
-
 
 	platform_set_drvdata(pdev, ndev);
 	ret = register_netdev(ndev);
