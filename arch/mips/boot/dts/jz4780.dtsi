@@ -524,6 +524,17 @@
 				};
 			};
 		};
+
+		adc@0x10070000 {
+			compatible = "ingenic,jz4780-adc";
+			reg = <0x10070000 0x30>;
+
+			interrupt-parent = <&intc>;
+			interrupts = <18>;
+
+			clocks = <&cgu JZ4780_CLK_SADC>;
+			clock-names = "adc";
+		};
 	};
 
 	ahb2 {
