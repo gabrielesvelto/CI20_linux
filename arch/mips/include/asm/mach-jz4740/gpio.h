@@ -18,6 +18,17 @@
 
 #include <linux/types.h>
 
+#ifdef CONFIG_MACH_JZ4780
+
+#include <asm-generic/gpio.h>
+
+#define gpio_get_value  __gpio_get_value
+#define gpio_set_value  __gpio_set_value
+#define gpio_cansleep   __gpio_cansleep
+#define gpio_to_irq     __gpio_to_irq
+
+#else /* CONFIG_MACH_JZ4780 */
+
 enum jz_gpio_function {
     JZ_GPIO_FUNC_NONE,
     JZ_GPIO_FUNC1,
@@ -393,5 +404,7 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask);
 
 #define JZ_GPIO_FUNC_UART1_RXD		JZ_GPIO_FUNC3
 #define JZ_GPIO_FUNC_UART1_TXD		JZ_GPIO_FUNC3
+
+#endif /* CONFIG_MACH_JZ4780 */
 
 #endif
