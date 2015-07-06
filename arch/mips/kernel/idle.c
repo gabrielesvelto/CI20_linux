@@ -14,6 +14,7 @@
 #include <linux/export.h>
 #include <linux/init.h>
 #include <linux/irqflags.h>
+#include <linux/leds.h>
 #include <linux/printk.h>
 #include <linux/sched.h>
 #include <asm/cpu.h>
@@ -259,10 +260,13 @@ void __init check_wait(void)
 
 void arch_cpu_idle(void)
 {
-	if (cpu_wait)
+	if (cpu_wait) {
+		ledtrig_cpu(CPU_LED_IDLE_START);
 		cpu_wait();
-	else
+		ledtrig_cpu(CPU_LED_IDLE_END);
+	} else {
 		local_irq_enable();
+	}
 }
 
 #ifdef CONFIG_CPU_IDLE
