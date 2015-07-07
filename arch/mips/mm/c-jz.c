@@ -57,6 +57,15 @@ static inline void r4k_on_each_cpu(void (*func) (void *info), void *info)
 	preempt_enable();
 }
 
+static inline void r4k_on_other_cpu(void (*func) (void *info), void *info)
+{
+#if !defined(CONFIG_MIPS_MT_SMP) && !defined(CONFIG_MIPS_MT_SMTC)
+	preempt_disable();
+	smp_call_function(func, info, 1);
+	preempt_enable();
+#endif
+}
+
 #if defined(CONFIG_MIPS_CMP)
 #define cpu_has_safe_index_cacheops 0
 #else
@@ -145,7 +154,8 @@ static void (* r4k_blast_dcache)(void);
 static void __cpuinit r4k_blast_dcache_setup(void)
 {
 	unsigned long dc_lsize = cpu_dcache_line_size();
-	r4k_blast_dcache_jz = blast_dcache_jz;
+	//r4k_blast_dcache_jz = blast_dcache_jz;
+	r4k_blast_dcache_jz = blast_dcache32;
 	if (dc_lsize == 0)
 		r4k_blast_dcache = (void *)cache_noop;
 	else if (dc_lsize == 16)
@@ -274,7 +284,8 @@ static void (* r4k_blast_icache)(void);
 static void __cpuinit r4k_blast_icache_setup(void)
 {
 	unsigned long ic_lsize = cpu_icache_line_size();
-	r4k_blast_icache_jz = blast_icache_jz;
+//	r4k_blast_icache_jz = blast_icache_jz;
+	r4k_blast_icache_jz = blast_icache32;
 	if (ic_lsize == 0)
 		r4k_blast_icache = (void *)cache_noop;
 	else if (ic_lsize == 16)
@@ -638,15 +649,15 @@ static inline void local_r4k_flush_icache_range(unsigned long start, unsigned lo
 {
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			r4k_blast_dcache_jz();
+                        r4k_blast_dcache();
 		} else {
 			R4600_HIT_CACHEOP_WAR_IMPL;
 			protected_blast_dcache_range(start, end);
 		}
 	}
 
-	if (end - start > icache_size)
-		r4k_blast_icache_jz();
+	if (end - start >= icache_size)
+		r4k_blast_icache();
 	else
 		protected_blast_icache_range(start, end);
 }
@@ -656,22 +667,134 @@ static inline void local_r4k_flush_icache_jz_ipi(void *args){
 static inline void local_r4k_flush_dcache_jz_ipi(void *args){
 	r4k_blast_dcache_jz();
 }
+
+
+/*
+   The other CPU maybe running in different process(different ASID) whit different address mapping,
+   so flush dcache all with local_r4k_flush_dcache_ipi() is safe.
+   But local_r4k_flush_dcache_ipi() flush icache all by index,
+   both flushed L1 icache and L2 cache, it slowdown the machine performance.
+   so optimized the routine as following.
+ */
+static inline void protected_blast_other_cpu_dcache_range_ipi(void *args)
+{
+	unsigned long lsize;
+	unsigned long addr;
+	unsigned long aend;
+	struct flush_icache_range_args * addrp;
+	unsigned long start;
+	unsigned long end;
+
+	addrp = (struct flush_icache_range_args *)args;
+	start = addrp->start;
+	end = addrp->end;
+
+	lsize = cpu_dcache_line_size();
+	addr = (start & ~(lsize - 1)) | INDEX_BASE; /* INDEX_BASE = 0x80000000 */
+	aend = ((end - 1) & ~(lsize - 1)) | INDEX_BASE;
+
+	//printk("protected_blast_other_cpu_dcache_range_ipi id=%d, start=%#x, size=%#x\n", smp_processor_id(),  (unsigned int)start, (unsigned int)(end-start));
+
+	while (1) {
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x0));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x1000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x2000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x3000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x4000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x5000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x6000));
+		protected_cache_op(Index_Writeback_Inv_D, (addr + 0x7000));
+		if (addr == aend)
+			break;
+		addr += lsize;
+	}
+
+	SYNC_WB();
+}
+
+/*
+   The other CPU maybe running in different process(different ASID) whit different address mapping,
+   so flush icache all with local_r4k_flush_icache_ipi() is safe.
+   But local_r4k_flush_icache_ipi() flush icache all by index,
+   both flushed L1 icache and L2 cache, it slowdown the machine performance.
+   so optimized the routine as following.
+ */
+static inline void protected_blast_other_cpu_icache_range_ipi(void *args)
+{
+	unsigned long lsize;
+	unsigned long addr;
+	unsigned long aend;
+	struct flush_icache_range_args * addrp;
+	unsigned long start;
+	unsigned long end;
+
+	addrp = (struct flush_icache_range_args *)args;
+	start = addrp->start;
+	end = addrp->end;
+
+	lsize = cpu_icache_line_size();
+	addr = (start & ~(lsize - 1)) | INDEX_BASE; /* INDEX_BASE = 0x80000000 */
+	aend = ((end - 1) & ~(lsize - 1)) | INDEX_BASE;
+
+	//printk("protected_blast_other_cpu_icache_range_ipi id=%d, start=%#x, size=%#x\n", smp_processor_id(),  (unsigned int)start, (unsigned int)(end-start));
+
+	while (1) {
+		protected_cache_op(Index_Invalidate_I, (addr + 0x0));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x1000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x2000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x3000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x4000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x5000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x6000));
+		protected_cache_op(Index_Invalidate_I, (addr + 0x7000));
+		if (addr == aend)
+			break;
+		addr += lsize;
+	}
+	INVALIDATE_BTB();
+}
+
+/*
+ * Test result by 2013-10-25:
+ * Flush complete dcache and icache on other CPUs with local_r4k_flush_dcache_jz_ipi()
+ * and local_r4k_flush_icache_jz_ipi(), running flushtest is stable 4days.
+ *
+ * Flush dcache_range and icache_range by index on other CPUs,
+ * with protected_blast_other_cpu_dcache_range_ipi() protected_blast_other_cpu_icache_range_ipi(),
+ * fails running flushtest after hours. It should be update in the future.
+ */
 static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 {
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			//r4k_blast_dcache_jz();
+                        /* Flush complete dcache on all CPUs */
 			r4k_on_each_cpu(local_r4k_flush_dcache_jz_ipi,0);
 		} else {
-			R4600_HIT_CACHEOP_WAR_IMPL;
+                        /* Flush dcache by address on this CPU */
 			protected_blast_dcache_range(start, end);
 		}
 	}
 
-	if (end - start > icache_size)
+	if (end - start >= icache_size)
+                /* Flush complete icache on all CPUs */
 		r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
-	else
+	else {
+		preempt_disable();
+                /* Flush icache by address on this CPU */
 		protected_blast_icache_range(start, end);
+		if (end-start <= PAGE_SIZE) {
+			/* Flush icache_range by index on other CPUs */
+			struct flush_icache_range_args range_addr;
+			range_addr.start = start;
+			range_addr.end = end;
+			smp_call_function(protected_blast_other_cpu_icache_range_ipi, &range_addr,1);
+		}
+		else {
+			/* Flush complete icache on other CPUs */
+			smp_call_function(local_r4k_flush_icache_jz_ipi,0,1);
+		}
+		preempt_enable();
+        }
 }
 #endif
 
