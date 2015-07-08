@@ -1728,7 +1728,7 @@ static int dwc_hdmi_platform_probe(struct platform_device *pdev)
 	if (irq < 0)
 		return -EINVAL;
 
-	ret = devm_request_irq(&pdev->dev, irq, dwc_hdmi_irq, 0,
+	ret = devm_request_irq(&pdev->dev, irq, dwc_hdmi_irq, IRQF_SHARED,
 			       dev_name(&pdev->dev), hdmi);
 
 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
