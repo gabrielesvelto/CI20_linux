@@ -55,6 +55,18 @@ enum dwc_hdmi_devtype {
 	DWC_HDMI,
 };
 
+struct dwc_hdmi;
+
+struct dwc_hdmi_audio_data {
+	int irq;
+	struct dwc_hdmi *dw;
+
+	u8 (*read)(struct dwc_hdmi *hdmi, int offset);
+	void (*write)(struct dwc_hdmi *hdmi, u8 val, int offset);
+	void (*mod)(struct dwc_hdmi *hdmi, u8 data, u8 mask, unsigned reg);
+	void (*set_sample_rate)(struct dwc_hdmi *hdmi, unsigned int rate);
+};
+
 struct dwc_hdmi {
 	struct drm_connector connector;
 	struct dwc_drm_connector *dwc_drm_connector;
@@ -63,6 +75,7 @@ struct dwc_hdmi {
 
 	struct drm_device *drm;
 
+	struct platform_device *audio_pdev;
 	enum dwc_hdmi_devtype dev_type;
 	struct device *dev;
 	struct clk *isfr_clk;
