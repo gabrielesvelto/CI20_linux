@@ -75,6 +75,14 @@ static inline u8 hdmi_readb(struct dwc_hdmi *hdmi, int offset)
 	return readb(hdmi->regs + (offset << hdmi->reg_shift));
 }
 
+static void hdmi_modb(struct dwc_hdmi *hdmi, u8 data, u8 mask, unsigned reg)
+{
+	u8 val = hdmi_readb(hdmi, reg) & ~mask;
+
+	val |= data & mask;
+	hdmi_writeb(hdmi, val, reg);
+}
+
 static void hdmi_mask_writeb(struct dwc_hdmi *hdmi, u8 data, unsigned int reg,
 		      u8 shift, u8 mask)
 {
@@ -310,6 +318,12 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dwc_hdmi *hdmi)
 {
 	/* Get pixel clock from ipu */
 	hdmi_get_pixel_clk(hdmi);
+	hdmi_set_clk_regenerator(hdmi);
+}
+
+static void hdmi_set_sample_rate(struct dwc_hdmi *hdmi, unsigned int sample_rate)
+{
+	hdmi->sample_rate = sample_rate;
 	hdmi_set_clk_regenerator(hdmi);
 }
 
@@ -1676,6 +1690,8 @@ MODULE_DEVICE_TABLE(of, dwc_hdmi_dt_ids);
 
 static int dwc_hdmi_platform_probe(struct platform_device *pdev)
 {
+	struct platform_device_info pdevinfo;
+	struct dwc_hdmi_audio_data audio;
 	const struct of_device_id *of_id =
 				of_match_device(dwc_hdmi_dt_ids, &pdev->dev);
 	struct device_node *np = pdev->dev.of_node;
@@ -1791,6 +1807,23 @@ static int dwc_hdmi_platform_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, hdmi);
 
+	memset(&pdevinfo, 0, sizeof(pdevinfo));
+	pdevinfo.parent = &pdev->dev;
+	pdevinfo.id = PLATFORM_DEVID_NONE;
+
+	audio.irq = irq;
+	audio.dw = hdmi;
+	audio.mod = hdmi_modb;
+	audio.read = hdmi_readb;
+	audio.write = hdmi_writeb;
+	audio.set_sample_rate = hdmi_set_sample_rate;
+
+	pdevinfo.name = "dw-hdmi-audio";
+	pdevinfo.data = &audio;
+	pdevinfo.size_data = sizeof(audio);
+	pdevinfo.dma_mask = DMA_BIT_MASK(32);
+	hdmi->audio_pdev = platform_device_register_full(&pdevinfo);
+	
 	return 0;
 
 err_iahb:
