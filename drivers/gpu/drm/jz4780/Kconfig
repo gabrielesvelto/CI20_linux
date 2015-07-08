@@ -11,3 +11,11 @@ config DRM_JZ4780
 	help
 	  Choose this option if you have an Ingenic SoC with LCDC display
 	  controller, for example the CI20 board
+
+config DRM_JZ4780_HDMI_AUDIO
+	tristate "Support for Ingenic JZ4780 HDMI Audio"
+	depends on DRM_JZ4780 && SND_JZ4740_SOC_I2S
+	select CI20_HDMI_AUDIO
+	help
+	  Choose this option to enable support for audio over HDMI
+	
