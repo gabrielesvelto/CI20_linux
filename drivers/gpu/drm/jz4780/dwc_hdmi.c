@@ -260,12 +260,11 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
 
 static void hdmi_get_pixel_clk(struct dwc_hdmi *hdmi)
 {
-	unsigned long rate;
+	struct hdmi_vmode *vmode = &hdmi->hdmi_data.video_mode;
+	
+	hdmi->pixel_clk_rate = vmode->mpixelclock;
 
-	rate = 65000000; /* FIXME */
-
-	if (rate)
-		hdmi->pixel_clk_rate = rate;
+	hdmi->ratio = 100;
 }
 
 static void hdmi_set_clk_regenerator(struct dwc_hdmi *hdmi)
