@@ -210,7 +210,8 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 	conf = jz4740_i2s_read(i2s, JZ_REG_AIC_CONF);
 
-	conf &= ~(JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER);
+	conf &= ~(JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER |
+		JZ_AIC_CONF_INTERNAL_CODEC);
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS:
@@ -224,6 +225,7 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		conf |= JZ_AIC_CONF_BIT_CLK_MASTER;
 		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
+		conf |= JZ_AIC_CONF_INTERNAL_CODEC;
 		break;
 	default:
 		return -EINVAL;
