@@ -341,6 +341,10 @@
 				pins_nemc_cs1: nemc-cs1 {
 					ingenic,pins = <&gpa 21 0 &pincfg_nobias>; /* cs1 */
 				};
+
+				pins_nemc_cs6: nemc-cs6 {
+					ingenic,pins = <&gpa 26 0 &pincfg_nobias>; /* cs6 */
+				};
 			};
 
 			pinfunc_i2c0: i2c0 {
