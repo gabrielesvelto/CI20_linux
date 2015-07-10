@@ -32,6 +32,7 @@
 #define GPIO_MIC_SW_EN 174
 
 static struct snd_soc_jack ci20_hp_jack;
+static struct snd_soc_jack ci20_hdmi_jack;
 
 static struct snd_soc_jack_pin ci20_hp_jack_pins[] = {
 	{
@@ -78,13 +79,58 @@ static int ci20_hp_event(struct snd_soc_dapm_widget *widget,
 static const struct snd_soc_dapm_widget ci20_widgets[] = {
 	SND_SOC_DAPM_MIC("Mic", NULL),
 	SND_SOC_DAPM_HP("Headphone Jack", ci20_hp_event),
+	SND_SOC_DAPM_LINE("HDMI", NULL),
 };
 
 static const struct snd_soc_dapm_route ci20_routes[] = {
 	{"Mic", NULL, "AIP2"},
 	{"Headphone Jack", NULL, "AOHPL"},
 	{"Headphone Jack", NULL, "AOHPR"},
+	{"HDMI", NULL, "TX"},
 };
+
+static int ci20_audio_hw_params(struct snd_pcm_substream *substream,
+				struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	unsigned int dai_fmt = rtd->dai_link->dai_fmt;
+	int mclk, ret;
+
+	switch (params_rate(params)) {
+	case 8000:
+	case 16000:
+	case 24000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
+	if (ret < 0) {
+		dev_err(cpu_dai->dev, "failed to set cpu_dai fmt.\n");
+		return ret;
+	}
+
+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk, SND_SOC_CLOCK_OUT);
+	if (ret < 0) {
+		dev_err(cpu_dai->dev, "failed to set cpu_dai sysclk.\n");
+		return ret;
+	}
+
+	return 0;
+}
 
 static int ci20_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -105,24 +151,58 @@ static int ci20_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
+static int ci20_hdmi_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
+
+	snd_soc_dapm_enable_pin(dapm, "HDMI");
+
+	/* Enable headphone jack detection */
+	snd_soc_jack_new(codec, "HDMI Jack", SND_JACK_LINEOUT,
+			 &ci20_hdmi_jack);
+
+	/* Jack is connected (it just is) */
+	snd_soc_jack_report(&ci20_hdmi_jack, SND_JACK_LINEOUT, SND_JACK_LINEOUT);
+	return 0;
+}
+
+static struct snd_soc_ops ci20_audio_dai_ops = {
+	.hw_params = ci20_audio_hw_params,
+};
+
 #define CI20_DAIFMT (SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF \
 					| SND_SOC_DAIFMT_CBM_CFM)
 
-static struct snd_soc_dai_link ci20_dai_link = {
-	.name = "ci20",
-	.stream_name = "jz4780",
-	.cpu_dai_name = "jz4780-i2s",
-	.platform_name = "jz4780-i2s",
-	.codec_dai_name = "jz4780-hifi",
-	.codec_name = "jz4780-codec",
-	.init = ci20_init,
-	.dai_fmt = CI20_DAIFMT,
+static struct snd_soc_dai_link ci20_dai_link[] = {
+	{
+		.name = "ci20",
+		.stream_name = "headphones",
+		.cpu_dai_name = "jz4780-i2s",
+		.platform_name = "jz4780-i2s",
+		.codec_dai_name = "jz4780-hifi",
+		.codec_name = "jz4780-codec",
+		.init = ci20_init,
+		.ops = &ci20_audio_dai_ops,
+		.dai_fmt = CI20_DAIFMT,
+	},
+	{
+		.name = "ci20 HDMI",
+		.stream_name = "hdmi",
+		.cpu_dai_name = "jz4780-i2s",
+		.platform_name = "jz4780-i2s",
+		.codec_dai_name = "dw-hdmi-hifi",
+		.codec_name = "dw-hdmi-audio",
+		.init = ci20_hdmi_init,
+		.ops = &ci20_audio_dai_ops,
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS,
+	}
 };
 
 static struct snd_soc_card ci20_audio_card = {
 	.name = "ci20",
-	.dai_link = &ci20_dai_link,
-	.num_links = 1,
+	.dai_link = ci20_dai_link,
+	.num_links = ARRAY_SIZE(ci20_dai_link),
 
 	.dapm_widgets = ci20_widgets,
 	.num_dapm_widgets = ARRAY_SIZE(ci20_widgets),
@@ -153,12 +233,16 @@ static int ingenic_asoc_ci20_probe(struct platform_device *pdev)
 			 "Phandle not found for i2s/codecs, using defaults\n");
 	} else {
 		dev_dbg(&pdev->dev, "Setting dai_link parameters\n");
-		ci20_dai_link.cpu_of_node = i2s;
-		ci20_dai_link.cpu_dai_name = NULL;
-		ci20_dai_link.platform_of_node = i2s;
-		ci20_dai_link.platform_name = NULL;
-		ci20_dai_link.codec_of_node = codec;
-		ci20_dai_link.codec_name = NULL;
+		ci20_dai_link[0].cpu_of_node = i2s;
+		ci20_dai_link[0].cpu_dai_name = NULL;
+		ci20_dai_link[1].cpu_of_node = i2s;
+		ci20_dai_link[1].cpu_dai_name = NULL;
+		ci20_dai_link[0].platform_of_node = i2s;
+		ci20_dai_link[0].platform_name = NULL;
+		ci20_dai_link[1].platform_of_node = i2s;
+		ci20_dai_link[1].platform_name = NULL;
+		ci20_dai_link[0].codec_of_node = codec;
+		ci20_dai_link[0].codec_name = NULL;
 	}
 
 	ret = gpio_request(GPIO_HP_MUTE, "Headphone Mute");
