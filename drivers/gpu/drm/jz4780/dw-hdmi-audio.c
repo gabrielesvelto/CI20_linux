@@ -38,6 +38,7 @@
 
 #include "dwc_hdmi.h"
 #include "dw-hdmi-audio.h"
+#include "dwc_hdmi_regs.h"
 
 struct snd_dwc_hdmi {
 	struct device *dev;
@@ -116,6 +117,7 @@ void disable_dw_hdmi_audio(struct snd_dwc_hdmi *hdmi)
 
 void set_dw_hdmi_audio_fmt(struct snd_dwc_hdmi *hdmi, struct hdmi_audio_fmt fmt)
 {
+	int val;
 	hdmi->data.mod(hdmi->data.dw, fmt.input_type, AUDIO_CONF0_INTERFACE_MSK,
 		       HDMI_AUD_CONF0);
 
@@ -131,6 +133,18 @@ void set_dw_hdmi_audio_fmt(struct snd_dwc_hdmi *hdmi, struct hdmi_audio_fmt fmt)
 	hdmi->data.write(hdmi->data.dw, 0, HDMI_AUD_INPUTCLKFS);
 
 	hdmi->data.set_sample_rate(hdmi->data.dw, fmt.sample_rate);
+
+	/* Set up the HDMI infoframe stuff too */
+
+	/* Set Channel Count (CC) */
+	val = fmt.chan_num << 4;
+	hdmi->data.write(hdmi->data.dw, val, HDMI_FC_AUDICONF0);
+
+	/* CA = 0 for stereo */
+	hdmi->data.write(hdmi->data.dw, 0, HDMI_FC_AUDICONF2);
+
+	/* Channels Valid */
+	hdmi->data.write(hdmi->data.dw, 0xee, HDMI_FC_AUDSV);
 }
 
 static int dw_hdmi_dai_startup(struct snd_pcm_substream *substream,
