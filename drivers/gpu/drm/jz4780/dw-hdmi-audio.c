@@ -88,7 +88,7 @@ static void dw_hdmi_jack_work(struct work_struct *work)
 		hdmi->jack_status = status ? SND_JACK_LINEOUT : 0;
 		snd_soc_jack_report(hdmi->jack, hdmi->jack_status,
 				    SND_JACK_LINEOUT);
-		dev_info(hdmi->dev, "jack report [%d]\n", hdmi->jack_status);
+		dev_dbg(hdmi->dev, "jack report [%d]\n", hdmi->jack_status);
 	}
 	hdmi->connect_status = status;
 }
@@ -152,7 +152,7 @@ static int dw_hdmi_dai_startup(struct snd_pcm_substream *substream,
 {
 	struct snd_dwc_hdmi *hdmi = snd_soc_dai_get_drvdata(codec_dai);
 
-	dev_info(codec_dai->dev, "[codec_dai]: startup.\n");
+	dev_dbg(codec_dai->dev, "[codec_dai]: startup.\n");
 	enable_dw_hdmi_audio(hdmi);
 
 	return 0;
@@ -182,7 +182,7 @@ static int dw_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 		dev_err(codec_dai->dev, "DAI format unsupported");
 		return -EINVAL;
 	}
-	dev_info(codec_dai->dev, "[codec_dai]: dai_fmt = %d.\n", fmt);
+	dev_dbg(codec_dai->dev, "[codec_dai]: dai_fmt = %d.\n", fmt);
 
 	width = params_width(params);
 	switch (width) {
@@ -194,7 +194,7 @@ static int dw_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 		dev_err(codec_dai->dev, "width[%d] not support!\n", width);
 		return -EINVAL;
 	}
-	dev_info(codec_dai->dev, "[codec_dai]: word_length = %d.\n", width);
+	dev_dbg(codec_dai->dev, "[codec_dai]: word_length = %d.\n", width);
 
 	chan = params_channels(params);
 	switch (chan) {
@@ -214,7 +214,7 @@ static int dw_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 		dev_err(codec_dai->dev, "channel[%d] not support!\n", chan);
 		return -EINVAL;
 	}
-	dev_info(codec_dai->dev, "[codec_dai]: chan_num = %d.\n", chan);
+	dev_dbg(codec_dai->dev, "[codec_dai]: chan_num = %d.\n", chan);
 
 	rate = params_rate(params);
 	switch (rate) {
@@ -231,7 +231,7 @@ static int dw_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 		dev_err(codec_dai->dev, "rate[%d] not support!\n", rate);
 		return -EINVAL;
 	}
-	dev_info(codec_dai->dev, "[codec_dai]: sample_rate = %d.\n", rate);
+	dev_dbg(codec_dai->dev, "[codec_dai]: sample_rate = %d.\n", rate);
 
 	hdmi_fmt.input_type = AUDIO_INPUTTYPE_IIS;
 
@@ -250,13 +250,13 @@ static int dw_hdmi_dai_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		disable_dw_hdmi_audio(hdmi);
-		dev_info(codec_dai->dev, "[codec_dai]: trigger enable.\n");
+		dev_dbg(codec_dai->dev, "[codec_dai]: trigger enable.\n");
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		enable_dw_hdmi_audio(hdmi);
-		dev_info(codec_dai->dev, "[codec_dai]: trigger disable.\n");
+		dev_dbg(codec_dai->dev, "[codec_dai]: trigger disable.\n");
 		break;
 	default:
 		return -EINVAL;
@@ -270,7 +270,7 @@ static void dw_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 {
 	struct snd_dwc_hdmi *hdmi = snd_soc_dai_get_drvdata(codec_dai);
 
-	dev_info(codec_dai->dev, "[codec_dai]: shutdown.\n");
+	dev_dbg(codec_dai->dev, "[codec_dai]: shutdown.\n");
 	disable_dw_hdmi_audio(hdmi);
 }
 
