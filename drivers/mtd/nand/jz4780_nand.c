@@ -175,7 +175,7 @@ static void jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 		 chip->ecc.size, chip->ecc.bytes);
 
 	if (nand->bch) {
-		chip->ecc.mode = NAND_ECC_HW_OOB_FIRST;
+		chip->ecc.mode = NAND_ECC_HW;
 		chip->ecc.hwctl = jz4780_nand_ecc_hwctl;
 		chip->ecc.calculate = jz4780_nand_ecc_calculate;
 		chip->ecc.correct = jz4780_nand_ecc_correct;
