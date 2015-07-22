@@ -94,51 +94,51 @@ static const struct jz47xx_cgu_clk_info jz4740_cgu_clocks[] = {
 	[JZ4740_CLK_PLL_HALF] = {
 		"pll half", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL, -1 },
-		.div = { CGU_REG_CPCCR, 21, 1, -1, -1, -1 },
+		.div = { CGU_REG_CPCCR, 21, 0, 1, -1, -1, -1 },
 	},
 
 	[JZ4740_CLK_CCLK] = {
 		"cclk", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL, -1 },
-		.div = { CGU_REG_CPCCR, 0, 4, 22, -1, -1 },
+		.div = { CGU_REG_CPCCR, 0, 0, 4, 22, -1, -1 },
 	},
 
 	[JZ4740_CLK_HCLK] = {
 		"hclk", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL, -1 },
-		.div = { CGU_REG_CPCCR, 4, 4, 22, -1, -1 },
+		.div = { CGU_REG_CPCCR, 4, 0, 4, 22, -1, -1 },
 	},
 
 	[JZ4740_CLK_PCLK] = {
 		"pclk", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL, -1 },
-		.div = { CGU_REG_CPCCR, 8, 4, 22, -1, -1 },
+		.div = { CGU_REG_CPCCR, 8, 0, 4, 22, -1, -1 },
 	},
 
 	[JZ4740_CLK_MCLK] = {
 		"mclk", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL, -1 },
-		.div = { CGU_REG_CPCCR, 12, 4, 22, -1, -1 },
+		.div = { CGU_REG_CPCCR, 12, 0, 4, 22, -1, -1 },
 	},
 
 	[JZ4740_CLK_LCD] = {
 		"lcd", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4740_CLK_PLL_HALF, -1 },
-		.div = { CGU_REG_CPCCR, 16, 5, 22, -1, -1 },
+		.div = { CGU_REG_CPCCR, 16, 0, 5, 22, -1, -1 },
 		.gate_bit = 10,
 	},
 
 	[JZ4740_CLK_LCD_PCLK] = {
 		"lcd_pclk", CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_PLL_HALF, -1 },
-		.div = { CGU_REG_LPCDR, 0, 11, -1, -1, -1 },
+		.div = { CGU_REG_LPCDR, 0, 0, 11, -1, -1, -1 },
 	},
 
 	[JZ4740_CLK_I2S] = {
 		"i2s", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4740_CLK_EXT, JZ4740_CLK_PLL_HALF, -1 },
 		.mux = { CGU_REG_CPCCR, 31, 1 },
-		.div = { CGU_REG_I2SCDR, 0, 8, -1, -1, -1 },
+		.div = { CGU_REG_I2SCDR, 0, 0, 8, -1, -1, -1 },
 		.gate_bit = 6,
 	},
 
@@ -146,21 +146,21 @@ static const struct jz47xx_cgu_clk_info jz4740_cgu_clocks[] = {
 		"spi", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4740_CLK_EXT, JZ4740_CLK_PLL, -1 },
 		.mux = { CGU_REG_SSICDR, 31, 1 },
-		.div = { CGU_REG_SSICDR, 0, 4, -1, -1, -1 },
+		.div = { CGU_REG_SSICDR, 0, 0, 4, -1, -1, -1 },
 		.gate_bit = 4,
 	},
 
 	[JZ4740_CLK_MMC] = {
 		"mmc", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4740_CLK_PLL_HALF, -1 },
-		.div = { CGU_REG_MSCCDR, 0, 5, -1, -1, -1 },
+		.div = { CGU_REG_MSCCDR, 0, 0, 5, -1, -1, -1 },
 		.gate_bit = 7,
 	},
 
 	[JZ4740_CLK_UHC] = {
 		"uhc", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4740_CLK_PLL_HALF, -1 },
-		.div = { CGU_REG_UHCCDR, 0, 4, -1, -1, -1 },
+		.div = { CGU_REG_UHCCDR, 0, 0, 4, -1, -1, -1 },
 		.gate_bit = 14,
 	},
 
@@ -168,7 +168,7 @@ static const struct jz47xx_cgu_clk_info jz4740_cgu_clocks[] = {
 		"udc", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { JZ4740_CLK_EXT, JZ4740_CLK_PLL_HALF, -1 },
 		.mux = { CGU_REG_CPCCR, 29, 1 },
-		.div = { CGU_REG_CPCCR, 23, 6, -1, -1, -1 },
+		.div = { CGU_REG_CPCCR, 23, 0, 6, -1, -1, -1 },
 		/* TODO: gate via SCR */
 	},
 
