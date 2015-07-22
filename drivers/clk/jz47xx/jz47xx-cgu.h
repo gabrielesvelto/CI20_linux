@@ -80,8 +80,11 @@ struct jz47xx_cgu_mux_info {
 /**
  * struct jz47xx_cgu_div_info - information about a divider
  * @reg: offset of the divider control register within the CGU
- * @shift: number of bits to shift the divide value by (ie. the index of
+ * @shift: number of bits to left shift the divide value by (ie. the index of
  *         the lowest bit of the divide value within its control register)
+ * @div: number of bits to right shift the divide value by (ie. for if the
+ *	 effective divider value is the value written to the register
+ *	 multiplied by some constant).
  * @bits: the size of the divide value in bits
  * @ce_bit: the index of the change enable bit within reg, or -1 is there
  *          isn't one
@@ -91,6 +94,7 @@ struct jz47xx_cgu_mux_info {
 struct jz47xx_cgu_div_info {
 	unsigned reg;
 	unsigned shift:5;
+	unsigned div:5;
 	unsigned bits:5;
 	int ce_bit:6;
 	int busy_bit:6;
