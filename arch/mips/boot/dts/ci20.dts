@@ -125,7 +125,7 @@
 
 &msc0 {
 	bus-width = <4>;
-	max-frequency = <48000000>;
+	max-frequency = <50000000>;
 	cd-gpios = <&gpf 20 GPIO_ACTIVE_LOW>;
 
 	pinctrl-names = "default";
