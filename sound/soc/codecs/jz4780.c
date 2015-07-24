@@ -242,6 +242,8 @@ static const struct snd_soc_dapm_widget jz4780_codec_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("AIP2"),
 	SND_SOC_DAPM_INPUT("AIP3"),
 
+	SND_SOC_DAPM_OUTPUT("SYSCLK"),
+
 	SND_SOC_DAPM_OUTPUT("AOHPL"),
 	SND_SOC_DAPM_OUTPUT("AOHPR"),
 };
@@ -258,6 +260,12 @@ static const struct snd_soc_dapm_route jz4780_codec_dapm_routes[] = {
 
 	{"AOHPL", NULL, "Output Mixer"},
 	{"AOHPR", NULL, "Output Mixer"},
+
+	/* SYSCLK output from the codec to the AIC is required to keep the
+	 * DMA transfer going during playback when all audible outputs have
+	 * been disabled.
+	 */
+	{"SYSCLK", NULL, "DAC" },
 };
 
 static int jz4780_codec_hw_params(struct snd_pcm_substream *substream,
