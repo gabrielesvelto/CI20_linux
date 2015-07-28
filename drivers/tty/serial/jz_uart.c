@@ -280,10 +280,10 @@ static inline void receive_chars(unsigned long data, unsigned int status)
 			else if (status & UART_LSR_FE)
 				flag = TTY_FRAME;
 		}
-/*
+
 		if (uart_handle_sysrq_char(&up->port, ch))
 			goto ignore_char;
-*/
+
 		uart_insert_char(&up->port, status, UART_LSR_OE, ch, flag);
 
 ignore_char:
