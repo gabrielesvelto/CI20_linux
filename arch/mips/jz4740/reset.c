@@ -61,10 +61,13 @@ static void jz4740_restart(char *command)
 #define JZ_REG_RTC_HIBERNATE		0x20
 #define JZ_REG_RTC_WAKEUP_FILTER	0x24
 #define JZ_REG_RTC_RESET_COUNTER	0x28
+#define JZ_REG_RTC_WENR			0x3C
 
 #define JZ_RTC_CTRL_WRDY		BIT(7)
 #define JZ_RTC_WAKEUP_FILTER_MASK	0x0000FFE0
 #define JZ_RTC_RESET_COUNTER_MASK	0x00000FE0
+#define JZ_RTC_WENR_PAT			0x0000A55A
+#define JZ_RTC_WENR_WEN			BIT(31)
 
 static inline void jz4740_rtc_wait_ready(void __iomem *rtc_base)
 {
@@ -73,6 +76,22 @@ static inline void jz4740_rtc_wait_ready(void __iomem *rtc_base)
 	do {
 		ctrl = readl(rtc_base + JZ_REG_RTC_CTRL);
 	} while (!(ctrl & JZ_RTC_CTRL_WRDY));
+}
+
+static inline void jz4740_rtc_reg_write(void __iomem *rtc_base, size_t reg,
+	uint32_t val)
+{
+	if (config_enabled(CONFIG_MACH_JZ4780)) {
+		jz4740_rtc_wait_ready(rtc_base);
+		writel(JZ_RTC_WENR_PAT, rtc_base + JZ_REG_RTC_WENR);
+		jz4740_rtc_wait_ready(rtc_base);
+
+		while (!(readl(rtc_base + JZ_REG_RTC_WENR) & JZ_RTC_WENR_WEN))
+			;
+	}
+
+	jz4740_rtc_wait_ready(rtc_base);
+	writel(val, rtc_base + reg);
 }
 
 static void jz4740_power_off(void)
@@ -98,8 +117,8 @@ static void jz4740_power_off(void)
 		wakeup_filter_ticks &= JZ_RTC_WAKEUP_FILTER_MASK;
 	else
 		wakeup_filter_ticks = JZ_RTC_WAKEUP_FILTER_MASK;
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(wakeup_filter_ticks, rtc_base + JZ_REG_RTC_WAKEUP_FILTER);
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_WAKEUP_FILTER,
+			     wakeup_filter_ticks);
 
 	/*
 	 * Set reset pin low-level assertion time after wakeup: 60 ms.
@@ -110,11 +129,10 @@ static void jz4740_power_off(void)
 		reset_counter_ticks &= JZ_RTC_RESET_COUNTER_MASK;
 	else
 		reset_counter_ticks = JZ_RTC_RESET_COUNTER_MASK;
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(reset_counter_ticks, rtc_base + JZ_REG_RTC_RESET_COUNTER);
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_RESET_COUNTER,
+			     reset_counter_ticks);
 
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(1, rtc_base + JZ_REG_RTC_HIBERNATE);
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_HIBERNATE, 1);
 
 	jz4740_halt();
 }
