@@ -66,7 +66,8 @@ LEAF(jz4780_secondary_cpu_entry)
 	la	t0, jz4780_cpu_entry_gp
 	lw	gp, 0(t0)
 
-	/* off we go! */
-	j	smp_bootstrap
+	/* jump to the kernel in kseg0 */
+	la	t0, smp_bootstrap
+	jr	t0
 	 nop
 	END(jz4780_secondary_cpu_entry)
