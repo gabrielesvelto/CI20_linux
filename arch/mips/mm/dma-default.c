@@ -195,9 +195,15 @@ static int mips_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 {
 	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
 	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
+	unsigned long addr = (unsigned long)cpu_addr;
 	unsigned long off = vma->vm_pgoff;
+	unsigned long pfn;
 	int ret = -ENXIO;
+
+	if (!plat_device_is_coherent(dev) && !hw_coherentio)
+		addr = CAC_ADDR(addr);
+
+	pfn = page_to_pfn(virt_to_page((void *)addr));
 
 	if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
