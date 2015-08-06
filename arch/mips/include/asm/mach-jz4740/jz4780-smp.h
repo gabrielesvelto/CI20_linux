@@ -86,9 +86,10 @@
 
 #ifdef CONFIG_SMP
 
+extern void jz4780_smp_wait_irqoff(void);
+
 extern void jz4780_smp_init(void);
 extern void jz4780_secondary_cpu_entry(void);
-extern void jz4780_smp_irq(void);
 
 #else /* !CONFIG_SMP */
 
