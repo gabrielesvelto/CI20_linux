@@ -37,6 +37,77 @@ u32 jz4780_cpu_entry_gp;
 
 static DEFINE_SPINLOCK(smp_lock);
 
+#define XBURST_TAGLO_DIRTY_MASK	0xc
+
+static inline __always_inline notrace void wback_dcache(void)
+{
+	unsigned long start = INDEX_BASE;
+	unsigned long end = start + current_cpu_data.dcache.waysize;
+	unsigned long ws_inc = 1UL << current_cpu_data.dcache.waybit;
+	unsigned long ws_end =
+		current_cpu_data.dcache.ways << current_cpu_data.dcache.waybit;
+	unsigned long ws, addr, tmp;
+
+	/*
+	 * Doing a writeback/invalidate on the whole cache has a significant
+	 * performance cost. In this loop we instead only writeback/invalidate
+	 * cache lines which are marked dirty. To do this we load the tag at
+	 * each index and check the (Ingenic-specific) dirty bits, and only
+	 * perform the operation if they are set. There is still a performance
+	 * cost to this but it is nowhere near as high as blasting the whole
+	 * cache.
+	 */
+	for (ws = 0; ws < ws_end; ws += ws_inc) {
+		for (addr = start; addr < end; addr += cpu_dcache_line_size()) {
+			__asm__ __volatile__(
+			"	.set push				\n"
+			"	.set noreorder				\n"
+			"	.set mips3				\n"
+			"	cache	%2, (%1)			\n"
+			"	ehb					\n"
+			"	mfc0	%0, " __stringify(CP0_TAGLO) "	\n"
+			"	and	%0, %0, %3			\n"
+			"	beq	$0, %0, 1f			\n"
+			"	 nop					\n"
+			"	cache	%4, (%1)			\n"
+			"1:	.set pop				\n"
+			: "=&r" (tmp)
+			: "r" (addr | ws),
+			  "i" (Index_Load_Tag_D),
+			  "i" (XBURST_TAGLO_DIRTY_MASK),
+			  "i" (Index_Writeback_Inv_D));
+		}
+	}
+}
+
+/*
+ * The Ingenic jz47xx SMP variant has to write back dirty cache lines before
+ * executing wait. The CPU & cache clock will be gated until we return from
+ * the wait, and if another core attempts to access data from our data cache
+ * during this time then it will lock up.
+ */
+void jz4780_smp_wait_irqoff(void)
+{
+	unsigned long pending = read_c0_cause() & read_c0_status() & CAUSEF_IP;
+
+	/*
+	 * Going to idle has a significant overhead due to the cache flush so
+	 * try to avoid it if we'll immediately be woken again due to an IRQ.
+	 */
+	if (!need_resched() && !pending) {
+		wback_dcache();
+
+		__asm__(
+		"	.set push	\n"
+		"	.set mips3	\n"
+		"	sync		\n"
+		"	wait		\n"
+		"	.set pop	\n");
+	}
+
+	local_irq_enable();
+}
+
 static irqreturn_t mbox_handler(int irq, void *dev_id)
 {
 	int cpu = smp_processor_id();
