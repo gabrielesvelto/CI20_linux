@@ -23,6 +23,10 @@
 #include <asm/idle.h>
 #include <asm/mipsregs.h>
 
+#ifdef CONFIG_MACH_JZ4780
+# include <asm/mach-jz4740/jz4780-smp.h>
+#endif
+
 /*
  * Not all of the MIPS CPUs have the "wait" instruction available. Moreover,
  * the implementation of the "wait" feature differs between CPU families. This
@@ -70,30 +74,6 @@ void r4k_wait_irqoff(void)
 		"	.set	pop		\n");
 	local_irq_enable();
 }
-
-#ifdef CONFIG_MACH_JZ4780
-extern void (*r4k_blast_dcache)(void);
-
-/*
- * The Ingenic jz47xx SMP variant has to invalidate the data cache before
- * executing wait. The CPU & cache clock will be gated until we return from
- * the wait, and if another core attempts to access data from our data cache
- * during this time then it will lock up.
- */
-static void jz_wait_irqoff(void)
-{
-	r4k_blast_dcache();
-
-	if (!need_resched())
-		__asm__(
-		"	.set push \n"
-		"	.set mips3 \n"
-		"	sync \n"
-		"	wait \n"
-		"	.set pop \n");
-	local_irq_enable();
-}
-#endif
 
 /*
  * The RM7000 variant has to handle erratum 38.	 The workaround is to not
@@ -248,7 +228,7 @@ void __init check_wait(void)
 	case CPU_JZRISC:
 #ifdef CONFIG_MACH_JZ4780
 		if (NR_CPUS > 1) {
-			cpu_wait = jz_wait_irqoff;
+			cpu_wait = jz4780_smp_wait_irqoff;
 		}
 		else
 #endif
