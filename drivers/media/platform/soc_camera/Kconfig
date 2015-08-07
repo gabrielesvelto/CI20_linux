@@ -17,6 +17,14 @@ config SOC_CAMERA_PLATFORM
 	help
 	  This is a generic SoC camera platform driver, useful for testing
 
+config VIDEO_JZ4780
+	tristate "JZ4780 Camera Sensor Interface driver"
+	depends on VIDEO_DEV && MACH_JZ4780 && SOC_CAMERA
+	depends on HAS_DMA
+	select VIDEOBUF_DMA_CONTIG
+	---help---
+	  This is a v4l2 driver for the Ingenic JZ4780 Camera Sensor Interface
+
 config VIDEO_MX3
 	tristate "i.MX3x Camera Sensor Interface driver"
 	depends on VIDEO_DEV && MX3_IPU && SOC_CAMERA
