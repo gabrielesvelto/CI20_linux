@@ -386,6 +386,23 @@
 							&gpf 24 1 &pincfg_nobias>; /* hdmi_sck */
 				};
 			};
+
+			pinfunc_cim: cim {
+				pins_cim: cim-pb {
+					ingenic,pins = <&gpb   6 0 &pincfg_nobias
+							&gpb   7 0 &pincfg_nobias
+							&gpb   8 0 &pincfg_nobias
+							&gpb   9 0 &pincfg_nobias
+							&gpb  10 0 &pincfg_nobias
+							&gpb  11 0 &pincfg_nobias
+							&gpb  12 0 &pincfg_nobias
+							&gpb  13 0 &pincfg_nobias
+							&gpb  14 0 &pincfg_nobias
+							&gpb  15 0 &pincfg_nobias
+							&gpb  16 0 &pincfg_nobias
+							&gpb  17 0 &pincfg_nobias>;
+				};
+			};
 		};
 
 		spi_gpio {
@@ -579,6 +596,21 @@
 
 			hdmi = <&hdmi>;
 			ddc = <&i2c4>;
+		};
+
+		cim: jz4780-cim@0x13060000 {
+			compatible = "ingenic,jz4780-cim";
+			reg = <0x13060000 0x68>;
+			reg-shift = <2>;
+
+			interrupt-parent = <&intc>;
+			interrupts = <30>;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pins_cim>;
+
+			clocks = <&cgu JZ4780_CLK_CIM>, <&cgu JZ4780_CLK_CIMMCLK>;
+			clock-names = "cim", "module";
 		};
 
 		hdmi: jz4780-hdmi3@0x10180000 {
