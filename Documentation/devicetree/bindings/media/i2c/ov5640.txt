@@ -1,0 +1,40 @@
+Omnivision 5Mp CMOS Digital Image Sensor
+
+The Omnivision OV5640 is a CMOS active pixel digital image sensor with an active
+array size of 2592H x 1944V. It is programmable through a simple two-wire serial
+interface.
+
+Required Properties:
+- compatible: value should be "omnivision,ov5640"
+- core-supply: phandle to regulator for core 1.5V
+- analog-supply: phandle to regulator for analog 2.8V
+
+Optional Properties:
+- gpio-enable: handle to GPIO connected to enable pin
+- gpio-reset: handle to GPIO connected to reset pin
+
+For further reading on port node refer to
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+Example:
+
+	i2c_master {
+		ov5640@0x3C {
+			compatible = "omnivision,ov5640";
+			reg = <0x3C>;
+
+			core-supply = <&vcim1v5_reg>;
+			analog-supply = <&vcim2v8_reg>;
+
+			gpio-enable = <&gpb 18 0>;
+			gpio-reset = <&gpb 26 0>;
+
+			remote = <&pxa_camera>;
+			port {
+				ov5640_1: endpoint {
+					bus-width = <8>;
+					remote-endpoint = <&pxa_camera>;
+				};
+			};
+		};
+	};
