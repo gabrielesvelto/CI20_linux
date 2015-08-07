@@ -1,0 +1,46 @@
+Ingenic JZ4780 camera host interface
+
+Required properties:
+- compatible: Should be "ingenic,jz4780-cim"
+- reg: register base and size
+- interrupts: the interrupt number
+- clocks : phandles to the module & baud clocks.
+- clock-names: tuple listing input clock names. 
+	Required elements: "cim", "module"
+
+Optional properties:
+ - clock-frequency: host interface is driving MCLK, and MCLK rate is this rate
+
+For further reading on port node refer to
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+ 
+Example:
+	cim: jz4780-cim@0x13060000 {
+		compatible = "ingenic,jz4780-cim";
+		reg = <0x13060000 0x68>;
+		reg-shift = <2>;
+
+		interrupt-parent = <&intc>;
+		interrupts = <30>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pins_cim>;
+
+		clocks = <&cgu JZ4780_CLK_CIM>, <&cgu JZ4780_CLK_CIMMCLK>;
+		clock-names = "cim", "module";
+		clock-frequency = <24000000>;
+		
+		port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* Parallel bus endpoint */
+		camera: endpoint@0 {
+			reg = <0>;		/* Local endpoint # */
+			remote-endpoint = <&ov5640_1>;
+			hsync-active = <1>;	/* Active high */
+			vsync-active = <1>;	/* Active high */
+			pclk-sample = <0>;	/* Falling */
+		};
+	};
+	};
