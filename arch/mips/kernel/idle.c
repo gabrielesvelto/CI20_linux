@@ -238,12 +238,20 @@ void __init check_wait(void)
 	}
 }
 
+void arch_cpu_idle_enter(void)
+{
+	ledtrig_cpu(CPU_LED_IDLE_START);
+}
+
+void arch_cpu_idle_exit(void)
+{
+	ledtrig_cpu(CPU_LED_IDLE_END);
+}
+
 void arch_cpu_idle(void)
 {
 	if (cpu_wait) {
-		ledtrig_cpu(CPU_LED_IDLE_START);
 		cpu_wait();
-		ledtrig_cpu(CPU_LED_IDLE_END);
 	} else {
 		local_irq_enable();
 	}
