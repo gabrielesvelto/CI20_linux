@@ -130,7 +130,9 @@ void set_dw_hdmi_audio_fmt(struct snd_dwc_hdmi *hdmi, struct hdmi_audio_fmt fmt)
 	hdmi->data.mod(hdmi->data.dw, fmt.dai_fmt, AUDIO_CONF1_DATAMODE_MSK,
 		       HDMI_AUD_CONF1);
 
-	hdmi->data.write(hdmi->data.dw, 0, HDMI_AUD_INPUTCLKFS);
+	/* Fs Factor used to calculate CTS and ACR packet insertion rate */
+	hdmi->data.write(hdmi->data.dw, HDMI_AUD_INPUTCLKFS_64,
+			 HDMI_AUD_INPUTCLKFS);
 
 	hdmi->data.set_sample_rate(hdmi->data.dw, fmt.sample_rate);
 
