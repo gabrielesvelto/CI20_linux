@@ -115,10 +115,16 @@ static void hdmi_regenerate_cts(struct dwc_hdmi *hdmi, unsigned int cts)
 	val &= ~HDMI_AUD_CTS3_CTS_MANUAL;
 	hdmi_writeb(hdmi, val, HDMI_AUD_CTS3);
 
+#ifndef CONFIG_MACH_JZ4780
+	/* JZ4780's HDMI controller implements automatic CTS/N generation
+	 * so we leave the CTS manual bit clear and don't set a rate.
+	 * Other implementations of the DWC HDMI transmitter may need this.
+	 */
 	hdmi_writeb(hdmi, cts & 0xff, HDMI_AUD_CTS1);
 	hdmi_writeb(hdmi, (cts >> 8) & 0xff, HDMI_AUD_CTS2);
 	hdmi_writeb(hdmi, ((cts >> 16) & HDMI_AUD_CTS3_AUDCTS19_16_MASK) |
 		    HDMI_AUD_CTS3_CTS_MANUAL, HDMI_AUD_CTS3);
+#endif
 }
 
 static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
