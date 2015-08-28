@@ -261,7 +261,7 @@ static int ingenic_asoc_ci20_probe(struct platform_device *pdev)
 	gpio_direction_output(GPIO_MIC_SW_EN, 0);
 
 	ret = snd_soc_register_card(card);
-	if (ret)
+	if ((ret) && (ret != -EPROBE_DEFER))
 		dev_err(&pdev->dev, "snd_soc_register_card() failed:%d\n", ret);
 
 	return ret;
