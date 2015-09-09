@@ -1651,6 +1651,14 @@ dm9000_drv_resume(struct device *dev)
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	board_info_t *db = netdev_priv(ndev);
 
+	gpio_direction_output(db->gpio.reset, 0);
+	msleep(10);
+	gpio_direction_output(db->gpio.reset, 1);
+	msleep(10);
+
+    /* GPIO0 on pre-activate PHY, Reg 1F is not set by reset */
+	iow(db, DM9000_GPR, 0);	/* REG_1F bit0 activate phyxcer */
+
 	if (ndev) {
 		if (netif_running(ndev)) {
 			/* reset if we were not in wake mode to ensure if
