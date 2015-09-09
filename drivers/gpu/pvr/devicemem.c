@@ -107,8 +107,8 @@ typedef struct _PVRSRV_DC_MAPINFO_
 
 static IMG_UINT32 g_ui32SyncUID = 0;
 #if defined (MEM_TRACK_INFO_DEBUG)
-PVRSRV_MEM_TRACK_INFO *g_psMemTrackInfoHead = NULL;
-PVRSRV_MEM_TRACK_INFO *g_psMemTrackInfoTail = NULL;
+PVRSRV_MEM_TRACK_INFO *g_psMemTrackInfoHead = IMG_NULL;
+PVRSRV_MEM_TRACK_INFO *g_psMemTrackInfoTail = IMG_NULL;
 IMG_UINT32	g_ui32NumOfOpsRecorded = 0;
 #endif
 
@@ -175,7 +175,7 @@ IMG_EXPORT
 IMG_VOID IMG_CALLCONV PVRSRVPrintMemTrackInfo(IMG_UINT32 ui32FaultAddr)
 {
 	PVRSRV_MEM_TRACK_INFO *psMemTrackInfo;
-	const IMG_CHAR *apszMemOpNames[] = {"UNKNOWN", "DEVICE", "DEVICECLASS", "WRAPPED", "MAPPED", "ION", "ALLOC", "FREE"};
+	static const IMG_CHAR * const apszMemOpNames[] = {"UNKNOWN", "DEVICE", "DEVICECLASS", "WRAPPED", "MAPPED", "ION", "ALLOC", "FREE"};
 	psMemTrackInfo = g_psMemTrackInfoHead;
 
 	PVR_DPF((PVR_DBG_MESSAGE,"PVRSRVMemTrackInfo: Dumping mem tracking info\n"));

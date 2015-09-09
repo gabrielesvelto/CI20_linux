@@ -738,26 +738,13 @@ static int __devinit jzhdmi_probe(struct platform_device *pdev)
 		return 0;
 	}
 #ifdef CONFIG_FORCE_RESOLUTION
-	for (i = 0; i < 5; i++) {
-		if (!CONFIG_FORCE_RESOLUTION)
-			break;
-		if ((phy_HotPlugDetected(0) > 0)) {
-			dev_info(jzhdmi->dev, "Force HDMI init VIC %d\n",
-				 CONFIG_FORCE_RESOLUTION);
-			api_phy_enable(PHY_ENABLE);
-			hdmi_init(jzhdmi);
-			hdmi_read_edid(jzhdmi);
-			jzhdmi->hdmi_info.out_type = CONFIG_FORCE_RESOLUTION;
-			hdmi_config(jzhdmi);
-			jzhdmi->hdmi_is_running = 1;
-			break;
-		} else {
-			if (i >= 4)
-				dev_err(jzhdmi->dev, "HDMI HPD fail\n");
-			mdelay(100);
-		}
-
-	}
+	dev_info(jzhdmi->dev, "Force HDMI init VIC %d\n", CONFIG_FORCE_RESOLUTION);
+	api_phy_enable(PHY_ENABLE);
+	hdmi_init(jzhdmi);
+	hdmi_read_edid(jzhdmi);
+	jzhdmi->hdmi_info.out_type = CONFIG_FORCE_RESOLUTION;
+	hdmi_config(jzhdmi);
+	jzhdmi->hdmi_is_running = 1;
 #endif
 
 

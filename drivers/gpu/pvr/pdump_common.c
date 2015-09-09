@@ -2531,13 +2531,15 @@ PVRSRV_ERROR PDumpMemUM(PVRSRV_PER_PROCESS_DATA *psPerProc,
 			if the a page exists at that address
 		*/
 		IMG_UINT32 ui32BytesRemain = ui32Bytes;
+		IMG_UINT32 ui32BytesToCopy = 0;
 		IMG_UINT32 ui32InPageStart = ui32Offset & (~HOST_PAGEMASK);
 		IMG_UINT32 ui32PageOffset = ui32Offset & (HOST_PAGEMASK);
-		IMG_UINT32 ui32BytesToCopy = MIN(HOST_PAGESIZE() - ui32InPageStart, ui32BytesRemain);
 
 		do
 		{
-			if (BM_MapPageAtOffset(BM_MappingHandleFromBuffer(psMemInfo->sMemBlk.hBuffer), ui32PageOffset))
+			ui32BytesToCopy = MIN(HOST_PAGESIZE() - ui32PageOffset, ui32BytesRemain);
+
+			if (BM_MapPageAtOffset(BM_MappingHandleFromBuffer(psMemInfo->sMemBlk.hBuffer), ui32InPageStart))
 			{
 				eError = OSCopyFromUser(psPerProc,
 							   pvAddrKM,
@@ -2577,8 +2579,9 @@ PVRSRV_ERROR PDumpMemUM(PVRSRV_PER_PROCESS_DATA *psPerProc,
 
 			VPTR_INC(pvAddrUM, ui32BytesToCopy);
 			ui32BytesRemain -= ui32BytesToCopy;
-			ui32InPageStart = 0;
-			ui32PageOffset += HOST_PAGESIZE();
+			ui32InPageStart += HOST_PAGESIZE();
+			ui32PageOffset = 0;
+
 		} while(ui32BytesRemain);
 	}
 	else

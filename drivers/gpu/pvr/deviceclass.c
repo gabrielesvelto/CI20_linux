@@ -338,7 +338,7 @@ PVRSRV_ERROR PVRSRVRegisterDCDeviceKM (PVRSRV_DC_SRV2DISP_KMJTABLE *psFuncTable,
 									   IMG_UINT32 *pui32DeviceID)
 {
 	PVRSRV_DISPLAYCLASS_INFO 	*psDCInfo = IMG_NULL;
-	PVRSRV_DEVICE_NODE			*psDeviceNode;
+	PVRSRV_DEVICE_NODE			*psDeviceNode = IMG_NULL;
 	SYS_DATA					*psSysData;
 
 	/*
@@ -439,6 +439,11 @@ ErrorExit:
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_DISPLAYCLASS_INFO), psDCInfo, IMG_NULL);
 	/*not nulling pointer, out of scope*/
 
+	if(psDeviceNode)
+	{
+		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_DEVICE_NODE), psDeviceNode, IMG_NULL);
+	}
+
 	return PVRSRV_ERROR_OUT_OF_MEMORY;
 }
 
@@ -538,7 +543,7 @@ PVRSRV_ERROR PVRSRVRegisterBCDeviceKM (PVRSRV_BC_SRV2BUFFER_KMJTABLE *psFuncTabl
 									   IMG_UINT32	*pui32DeviceID)
 {
 	PVRSRV_BUFFERCLASS_INFO	*psBCInfo = IMG_NULL;
-	PVRSRV_DEVICE_NODE		*psDeviceNode;
+	PVRSRV_DEVICE_NODE		*psDeviceNode = IMG_NULL;
 	SYS_DATA				*psSysData;
 	/*
 		IN:
@@ -627,12 +632,17 @@ ErrorExit:
 
 	if(psBCInfo->psFuncTable)
 	{
-		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PPVRSRV_BC_SRV2BUFFER_KMJTABLE), psBCInfo->psFuncTable, IMG_NULL);
+		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_BC_SRV2BUFFER_KMJTABLE), psBCInfo->psFuncTable, IMG_NULL);
 		psBCInfo->psFuncTable = IMG_NULL;
 	}
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_BUFFERCLASS_INFO), psBCInfo, IMG_NULL);
 	/*not nulling shared pointer, wasn't allocated to this point*/
+
+	if(psDeviceNode)
+	{
+		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_DEVICE_NODE), psDeviceNode, IMG_NULL);
+	}
 
 	return PVRSRV_ERROR_OUT_OF_MEMORY;
 }
@@ -850,7 +860,6 @@ PVRSRV_ERROR PVRSRVOpenDCDeviceKM (PVRSRV_PER_PROCESS_DATA	*psPerProc,
 
 	if(psDCInfo->ui32RefCount++ == 0)
 	{
-
 		psDeviceNode = (PVRSRV_DEVICE_NODE *)hDevCookie;
 
 		/* store the device kernel context to map into */
@@ -863,8 +872,7 @@ PVRSRV_ERROR PVRSRVOpenDCDeviceKM (PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenDCDeviceKM: Failed sync info alloc"));
-			psDCInfo->ui32RefCount--;
-			return eError;
+			goto ErrorExit;
 		}
 
 		/* open the external device */
@@ -874,9 +882,7 @@ PVRSRV_ERROR PVRSRVOpenDCDeviceKM (PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenDCDeviceKM: Failed to open external DC device"));
-			psDCInfo->ui32RefCount--;
-			PVRSRVKernelSyncInfoDecRef(psDCInfo->sSystemBuffer.sDeviceClassBuffer.psKernelSyncInfo, IMG_NULL);
-			return eError;
+			goto ErrorExitSyncInfo;
 		}
 
 		psDCPerContextInfo->psDCInfo = psDCInfo;
@@ -884,9 +890,7 @@ PVRSRV_ERROR PVRSRVOpenDCDeviceKM (PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenDCDeviceKM: Failed to get system buffer"));
-			psDCInfo->ui32RefCount--;
-			PVRSRVKernelSyncInfoDecRef(psDCInfo->sSystemBuffer.sDeviceClassBuffer.psKernelSyncInfo, IMG_NULL);
-			return eError;
+			goto ErrorExitCloseDevice;
 		}
 		psDCInfo->sSystemBuffer.sDeviceClassBuffer.ui32MemMapRefCount = 0;
 	}
@@ -905,6 +909,17 @@ PVRSRV_ERROR PVRSRVOpenDCDeviceKM (PVRSRV_PER_PROCESS_DATA	*psPerProc,
 	*phDeviceKM = (IMG_HANDLE)psDCPerContextInfo;
 
 	return PVRSRV_OK;
+
+ErrorExitCloseDevice:
+	psDCInfo->psFuncTable->pfnCloseDCDevice(psDCInfo->hExtDevice);
+	
+ErrorExitSyncInfo:
+	PVRSRVKernelSyncInfoDecRef(psDCInfo->sSystemBuffer.sDeviceClassBuffer.psKernelSyncInfo, IMG_NULL);
+
+ErrorExit:
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_DISPLAYCLASS_PERCONTEXT_INFO), psDCPerContextInfo, IMG_NULL);
+	psDCInfo->ui32RefCount = 0;
+	return eError;
 }
 
 
@@ -1252,6 +1267,12 @@ static PVRSRV_ERROR PVRSRVCreateDCSwapChainRefKM(PVRSRV_PER_PROCESS_DATA	*psPerP
 												  psSwapChainRef,
 												  0,
 												  &DestroyDCSwapChainRefCallBack);
+	if (psSwapChainRef->hResItem == IMG_NULL)
+	{
+			PVR_DPF ((PVR_DBG_ERROR, "PVRSRVCreateDCSwapChainRefKM: ResManRegisterRes failed"));
+			OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_DC_SWAPCHAIN_REF), psSwapChainRef, IMG_NULL);
+			return PVRSRV_ERROR_INVALID_PARAMS;
+	}
 	*ppsSwapChainRef = psSwapChainRef;
 
 	return PVRSRV_OK;
@@ -1777,7 +1798,7 @@ static IMG_VOID FreePrivateData(IMG_HANDLE hCallbackData)
 {
 	CALLBACK_DATA *psCallbackData = hCallbackData;
 
-	if(psCallbackData->ui32PrivDataLength > 0)
+	if(psCallbackData->ui32PrivDataLength)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, psCallbackData->ui32PrivDataLength,
 				  psCallbackData->pvPrivData, IMG_NULL);
@@ -2703,7 +2724,7 @@ FoundDevice:
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenBCDeviceKM: Failed to open external BC device"));
-			return eError;
+			goto ErrorExit;
 		}
 
 		/* get information about the buffers */
@@ -2711,7 +2732,7 @@ FoundDevice:
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenBCDeviceKM : Failed to get BC Info"));
-			return eError;
+			goto ErrorExitCloseDevice;
 		}
 
 		/* interpret and store info */
@@ -2726,7 +2747,7 @@ FoundDevice:
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenBCDeviceKM: Failed to allocate BC buffers"));
-			return eError;
+			goto ErrorExitCloseDevice;
 		}
 		OSMemSet (psBCInfo->psBuffer,
 					0,
@@ -2741,7 +2762,7 @@ FoundDevice:
 			if(eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenBCDeviceKM: Failed sync info alloc"));
-				goto ErrorExit;
+				goto ErrorExitBuffers;
 			}
 			
 			/*
@@ -2755,7 +2776,7 @@ FoundDevice:
 			if(eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,"PVRSRVOpenBCDeviceKM: Failed to get BC buffers"));
-				goto ErrorExit;
+				goto ErrorExitBuffers;
 			}
 
 			/* setup common device class info */
@@ -2778,8 +2799,7 @@ FoundDevice:
 
 	return PVRSRV_OK;
 
-ErrorExit:
-
+ErrorExitBuffers:
 	/* free syncinfos */
 	for(i=0; i<psBCInfo->ui32BufferCount; i++)
 	{
@@ -2790,12 +2810,15 @@ ErrorExit:
 	}
 
 	/* free buffers */
-	if(psBCInfo->psBuffer)
-	{
-		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_BC_BUFFER), psBCInfo->psBuffer, IMG_NULL);
-		psBCInfo->psBuffer = IMG_NULL;
-	}
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_BC_BUFFER), psBCInfo->psBuffer, IMG_NULL);
+	psBCInfo->psBuffer = IMG_NULL;
 
+ErrorExitCloseDevice:
+	psBCInfo->psFuncTable->pfnCloseBCDevice(psBCInfo->ui32DeviceID, psBCInfo->hExtDevice);
+
+ErrorExit:
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_BUFFERCLASS_PERCONTEXT_INFO), psBCPerContextInfo, IMG_NULL);
+	psBCInfo->ui32RefCount = 0;
 	return eError;
 }
 
