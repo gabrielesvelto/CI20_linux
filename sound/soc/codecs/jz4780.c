@@ -198,7 +198,7 @@ static const struct soc_enum mic1_input_enum =
 	SOC_ENUM_SINGLE(REG_CR_MIC1, 0, 2, mic1_input_mux_text);
 
 static const struct snd_kcontrol_new mic1_input_mux =
-	SOC_DAPM_ENUM("Mic Input Mux", mic1_input_enum);
+	SOC_DAPM_ENUM("ADC Capture Route", mic1_input_enum);
 
 static const struct snd_kcontrol_new jz4780_codec_controls[] = {
 	SOC_DOUBLE_R("Master Capture Volume", REG_GCR_ADCL, REG_GCR_ADCR,
@@ -214,27 +214,16 @@ static const struct snd_kcontrol_new jz4780_codec_controls[] = {
 	SOC_SINGLE("Headphone Mute", REG_CR_HP, 7, 1, 0),
 };
 
-static const struct snd_kcontrol_new jz4780_codec_input_controls[] = {
-	SOC_DAPM_SINGLE("Mic Capture Switch", REG_CR_MIC1, 4, 1, 1),
-};
-
-static const struct snd_kcontrol_new jz4780_codec_output_controls[] = {
-	SOC_DAPM_SINGLE("DAC Switch", REG_CR_DAC, 4, 1, 1),
-};
-
 static const struct snd_soc_dapm_widget jz4780_codec_dapm_widgets[] = {
+	SND_SOC_DAPM_SUPPLY("ADC_SUPPLY", REG_CR_ADC, 4, 1, NULL, 0),
 	SND_SOC_DAPM_ADC("ADC", "Capture", REG_AICR_ADC, 4, 1),
+
+	SND_SOC_DAPM_SUPPLY("DAC_SUPPLY", REG_CR_DAC, 4, 1, NULL, 0),
 	SND_SOC_DAPM_DAC("DAC", "Playback", REG_AICR_DAC, 4, 1),
 
-	SND_SOC_DAPM_MUX("Mic Input Mux", SND_SOC_NOPM, 0, 0, &mic1_input_mux),
+	SND_SOC_DAPM_MUX("ADC Capture Route", REG_CR_MIC1, 4, 1, &mic1_input_mux),
 
-	SND_SOC_DAPM_MIXER_NAMED_CTL("Input Mixer", REG_CR_ADC, 4, 1,
-			jz4780_codec_input_controls,
-			ARRAY_SIZE(jz4780_codec_input_controls)),
-
-	SND_SOC_DAPM_MIXER("Output Mixer", REG_CR_HP, 4, 1,
-			jz4780_codec_output_controls,
-			ARRAY_SIZE(jz4780_codec_output_controls)),
+	SND_SOC_DAPM_MIXER("Headphones", REG_CR_HP, 4, 1, NULL, 0),
 
 	SND_SOC_DAPM_MICBIAS("Mic Bias", REG_CR_MIC1, 5, 1),
 
@@ -249,17 +238,16 @@ static const struct snd_soc_dapm_widget jz4780_codec_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route jz4780_codec_dapm_routes[] = {
-	{"ADC", NULL, "Input Mixer"},
+	{"ADC", NULL, "ADC_SUPPLY"},
+	{"ADC", NULL, "ADC Capture Route"},
 
-	{"Input Mixer", "Mic Capture Switch", "Mic Input Mux"},
+	{"ADC Capture Route", "AIP1", "AIP1"},
+	{"ADC Capture Route", "AIP2", "AIP2"},
 
-	{"Mic Input Mux", "AIP1", "AIP1"},
-	{"Mic Input Mux", "AIP2", "AIP2"},
-
-	{"Output Mixer", "DAC Switch", "DAC"},
-
-	{"AOHPL", NULL, "Output Mixer"},
-	{"AOHPR", NULL, "Output Mixer"},
+	{"DAC", NULL, "DAC_SUPPLY"},
+	{"Headphones", NULL, "DAC"},
+	{"AOHPL", NULL, "Headphones"},
+	{"AOHPR", NULL, "Headphones"},
 
 	/* SYSCLK output from the codec to the AIC is required to keep the
 	 * DMA transfer going during playback when all audible outputs have
