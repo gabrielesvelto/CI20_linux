@@ -204,14 +204,16 @@ static const struct snd_kcontrol_new jz4780_codec_controls[] = {
 	SOC_DOUBLE_R("Master Capture Volume", REG_GCR_ADCL, REG_GCR_ADCR,
 		0, 63, 0),
 
-	SOC_SINGLE("Mic Volume", REG_GCR_MIC1, 0, 7, 0),
-	SOC_SINGLE("Mic Mute", REG_CR_ADC, 7, 1, 0),
+	SOC_SINGLE("Mic Capture Volume", REG_GCR_MIC1, 0, 7, 0),
+	SOC_SINGLE("Mic Capture Switch", REG_CR_ADC, 7, 1, 1),
 
 	SOC_DOUBLE_R("Master Playback Volume", REG_GCR_DACL, REG_GCR_DACR,
 		0, 31, 1),
+	SOC_SINGLE("Master Playback Switch", REG_CR_DAC, 7, 1, 1),
 
-	SOC_DOUBLE_R("Headphone Volume", REG_GCR_HPL, REG_GCR_HPR, 0, 31, 1),
-	SOC_SINGLE("Headphone Mute", REG_CR_HP, 7, 1, 0),
+	SOC_DOUBLE_R("Headphone Playback Volume", REG_GCR_HPL, REG_GCR_HPR,
+		0, 31, 1),
+	SOC_SINGLE("Headphone Playback Switch", REG_CR_HP, 7, 1, 1),
 };
 
 static const struct snd_soc_dapm_widget jz4780_codec_dapm_widgets[] = {
