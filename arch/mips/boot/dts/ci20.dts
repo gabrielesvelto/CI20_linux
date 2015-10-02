@@ -238,6 +238,31 @@
 	};
 };
 
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart0_data>;
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart1_data>;
+};
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart2_dataplusflow>;
+};
+
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart3_data>;
+};
+
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart4_data>;
+};
+
 &i2c0 {
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
