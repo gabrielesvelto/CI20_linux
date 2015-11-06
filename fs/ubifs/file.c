@@ -178,7 +178,7 @@ out_free:
 out:
 	SetPageUptodate(page);
 	ClearPageError(page);
-	flush_dcache_page(page);
+	__flush_dcache_page(page);
 	kunmap(page);
 	return 0;
 
@@ -186,7 +186,7 @@ error:
 	kfree(dn);
 	ClearPageUptodate(page);
 	SetPageError(page);
-	flush_dcache_page(page);
+	__flush_dcache_page(page);
 	kunmap(page);
 	return err;
 }
