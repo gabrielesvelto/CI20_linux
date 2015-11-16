@@ -1504,7 +1504,67 @@ static int dwc_hdmi_connector_get_modes(struct drm_connector *connector)
 static int dwc_hdmi_connector_mode_valid(struct drm_connector *connector,
 			  struct drm_display_mode *mode)
 {
-	return MODE_OK;
+
+      unsigned int bandwidth;
+      uint32_t hbp, hfp, hsw, vbp, vfp, vsw;
+
+      /*
+	* check to see if the width is within the range that
+	* the LCD Controller physically supports
+	*/
+      if (mode->hdisplay > 2048)
+	      return MODE_VIRTUAL_X;
+
+      /* width must be multiple of 16 */
+      if (mode->hdisplay & 0xf)
+		return MODE_VIRTUAL_X;
+
+      if (mode->vdisplay > 2048)
+	      return MODE_VIRTUAL_Y;
+
+      DRM_DEBUG_DRIVER("Processing mode %dx%d@%d with pixel clock %d",
+	      mode->hdisplay, mode->vdisplay,
+	      drm_mode_vrefresh(mode), mode->clock);
+
+      hbp = mode->htotal - mode->hsync_end;
+      hfp = mode->hsync_start - mode->hdisplay;
+      hsw = mode->hsync_end - mode->hsync_start;
+      vbp = mode->vtotal - mode->vsync_end;
+      vfp = mode->vsync_start - mode->vdisplay;
+      vsw = mode->vsync_end - mode->vsync_start;
+
+      if ((hbp-1) & ~0x3ff) {
+	      DRM_DEBUG_DRIVER("Prune: Horizontal Back Porch out of range");
+	      return MODE_HBLANK_WIDE;
+      }
+
+      if ((hfp-1) & ~0x3ff) {
+	      DRM_DEBUG_DRIVER("Prune: Horizontal Front Porch out of range");
+	      return MODE_HBLANK_WIDE;
+      }
+
+      if ((hsw-1) & ~0x3ff) {
+	      DRM_DEBUG_DRIVER("Prune: Horizontal Sync Width out of range");
+	      return MODE_HSYNC_WIDE;
+      }
+
+      if (vbp & ~0xff) {
+	      DRM_DEBUG_DRIVER("Prune: Vertical Back Porch out of range");
+	      return MODE_VBLANK_WIDE;
+      }
+
+      if (vfp & ~0xff) {
+	      DRM_DEBUG_DRIVER("Prune: Vertical Front Porch out of range");
+	      return MODE_VBLANK_WIDE;
+      }
+
+      if ((vsw-1) & ~0x3f) {
+	      DRM_DEBUG_DRIVER("Prune: Vertical Sync Width out of range");
+	      return MODE_VSYNC_WIDE;
+      }
+
+      return MODE_OK;
+
 }
 
 static struct drm_encoder *dwc_hdmi_connector_best_encoder(struct drm_connector
