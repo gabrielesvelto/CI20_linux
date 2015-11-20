@@ -1540,7 +1540,7 @@ static const struct net_protocol igmp_protocol = {
 
 static const struct net_protocol tcp_protocol = {
 	.handler =	tcp_v4_rcv,
-	.err_handler =	tcp_v4_err,
+	.err_handler =	ping_v4_err,
 	.gso_send_check = tcp_v4_gso_send_check,
 	.gso_segment =	tcp_tso_segment,
 	.gro_receive =	tcp4_gro_receive,
@@ -1560,7 +1560,7 @@ static const struct net_protocol udp_protocol = {
 
 static const struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
-	.err_handler =	ping_err,
+	.err_handler =	ping_v4_err,
 	.no_policy =	1,
 	.netns_ok =	1,
 };
