@@ -684,10 +684,23 @@ static void emulate_load_store_insn(struct pt_regs *regs,
 		/* Cannot handle 64-bit instructions in 32-bit kernel */
 		goto sigill;
 
+	case cop1x_op:
+		switch (insn.f_format.func) {
+			case lwxc1_op:
+			case swxc1_op:
+			case ldxc1_op:
+			case sdxc1_op:
+				goto fpu_continue;
+			default:
+				goto sigill;
+		}
+		break;
+
 	case lwc1_op:
 	case ldc1_op:
 	case swc1_op:
 	case sdc1_op:
+fpu_continue:
 		die_if_kernel("Unaligned FP access in kernel code", regs);
 		BUG_ON(!used_math());
 
