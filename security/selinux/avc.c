@@ -783,7 +783,7 @@ static inline int avc_xperms_audit(u32 ssid, u32 tsid, u16 tclass,
 	if (likely(!audited))
 		return 0;
 	return slow_avc_audit(ssid, tsid, tclass, requested,
-			audited, denied, result, ad, 0);
+			audited, denied, result, avd, ad, 0);
 }
 
 /**
