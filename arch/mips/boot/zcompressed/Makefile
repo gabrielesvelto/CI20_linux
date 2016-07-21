@@ -6,7 +6,7 @@
 
 targets		:= zImage uImage vmlinuz vmlinux.bin.gz head.o misc.o piggy.o dummy.o
 
-OBJS 		:= $(obj)/head.o $(obj)/misc.o
+OBJS 		:= $(obj)/head.o $(obj)/misc.o $(obj)/cache.o
 
 LD_ARGS 	:= -T $(srctree)/$(src)/ld.script -Ttext 0x80F00000 -Bstatic -melf32ltsmip
 OBJCOPY_ARGS 	:= -O elf32-tradlittlemips
