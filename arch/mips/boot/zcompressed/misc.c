@@ -11,6 +11,7 @@
  */
 
 #include "base.h"
+#include "cache.h"
 #include <asm/addrspace.h>
 #include <stdarg.h>
 
@@ -78,8 +79,6 @@ static void gzip_release(void **);
 
 void* memset(void* s, int c, size_t n);
 void* memcpy(void* __dest, __const void* __src, size_t __n);
-
-extern void flushcaches(void); /* defined in head.S */
 
 char *input_data;
 int input_len;
@@ -368,7 +367,7 @@ void decompress_kernel(unsigned int imageaddr, unsigned int imagesize, unsigned 
 	makecrc();
 	puts("Uncompressing Linux...\n");
 	gunzip();
-	flushcaches();
+	cache_flush_all();
 	puts("Ok, booting the kernel.\n");
 #if 0
 	{
