@@ -34,7 +34,7 @@
 #define cpu_has_ic_fills_f_dc	0
 #define cpu_has_pindexed_dcache 0
 #define cpu_has_mips32r1	1
-#define cpu_has_mips32r2	1
+#define cpu_has_mips32r2	0
 #define cpu_has_mips64r1	0
 #define cpu_has_mips64r2	0
 #define cpu_has_dsp		0

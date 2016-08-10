@@ -598,6 +598,8 @@
 			clocks = <&cgu JZ4780_CLK_SADC>;
 			clock-names = "adc";
 		};
+
+
 	};
 
 	ahb2 {
@@ -771,6 +773,26 @@
 			phys = <&usb_phy>;
 			phy-names = "usb2-phy";
 			g-tx-fifo-size = <256 256 256 256>;
+		};
+		vpu: jz4780-vpuk@0x13200000 {
+			compatible = "ingenic,jz4780-vpu";
+			reg = <0x13200000 0x100000>;
+
+			 clocks = <&cgu JZ4780_CLK_VPU>;
+			 clock-names = "vpu_clk";
+
+			 interrupt-parent = <&intc>;
+			 interrupts = <62>;
+		};
+		ipu: jz4780-ipu0@0x13080000 {
+			compatible = "ingenic,jz4780-ipu0";
+			reg = <0x130b0000 0x800>;
+
+			 clocks = <&cgu JZ4780_CLK_IPU>;
+			 clock-names = "ipu_clk";
+
+			 interrupt-parent = <&intc>;
+			 interrupts = <22>;
 		};
 	};
 };

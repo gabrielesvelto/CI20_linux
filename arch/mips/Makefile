@@ -62,7 +62,7 @@ ld-emul			= $(32bit-emul)
 vmlinux-32		= vmlinux
 vmlinux-64		= vmlinux.64
 
-cflags-y		+= -mabi=32
+cflags-y		+= -mabi=32 -mgp32 -mfp32
 endif
 
 ifdef CONFIG_64BIT
@@ -88,7 +88,7 @@ all-$(CONFIG_SYS_SUPPORTS_ZBOOT)+= vmlinuz
 # crossformat linking we rely on the elf2ecoff tool for format conversion.
 #
 cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
-cflags-y			+= -msoft-float
+cflags-y			+= -msoft-float -Wa,-mhard-float
 LDFLAGS_vmlinux			+= -G 0 -static -n -nostdlib
 KBUILD_AFLAGS_MODULE		+= -mlong-calls
 KBUILD_CFLAGS_MODULE		+= -mlong-calls

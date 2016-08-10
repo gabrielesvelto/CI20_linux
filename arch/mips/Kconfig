@@ -254,7 +254,7 @@ config MACH_JZ4740
 
 config MACH_JZ4780
 	bool "Ingenic JZ4780 based machines"
-	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_HAS_CPU_MIPS32_R1
 	select SYS_SUPPORTS_32BIT_KERNEL
 	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select SYS_SUPPORTS_ZBOOT_UART16550
@@ -271,8 +271,8 @@ config MACH_JZ4780
 	select BUILTIN_DTB
 	select USE_OF
 	select LIBFDT
-	select MIPS_CPU_SCACHE
 	select SYS_SUPPORTS_SMP
+	select CONFIG_XBURST_CACHE
 
 config LANTIQ
 	bool "Lantiq based platforms"
@@ -1967,7 +1967,11 @@ config CPU_R4K_FPU
 
 config CPU_R4K_CACHE_TLB
 	bool
-	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON)
+	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON || MACH_JZ4780)
+
+config XBURST_CACHE
+	bool
+	default y if (MACH_JZ4780)
 
 config MIPS_MT_SMP
 	bool "MIPS MT SMP support (1 TC on each available VPE)"

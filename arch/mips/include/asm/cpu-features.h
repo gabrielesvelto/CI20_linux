@@ -13,6 +13,10 @@
 #include <asm/cpu-info.h>
 #include <cpu-feature-overrides.h>
 
+//#ifndef current_cpu_type
+//#define current_cpu_type()      current_cpu_data.cputype
+//#endif
+
 /*
  * SMP assumption: Options of CPU 0 are a superset of all processors.
  * This is true for all known MIPS systems.
@@ -106,6 +110,9 @@
 #endif
 #ifndef kernel_uses_llsc
 #define kernel_uses_llsc	cpu_has_llsc
+#endif
+#ifndef cpu_has_mmips
+#define cpu_has_mmips		(cpu_data[0].options & MIPS_CPU_MICROMIPS)
 #endif
 #ifndef cpu_has_mips16
 #define cpu_has_mips16		(cpu_data[0].ases & MIPS_ASE_MIPS16)
@@ -259,8 +266,16 @@
 #define cpu_has_mipsmt		(cpu_data[0].ases & MIPS_ASE_MIPSMT)
 #endif
 
+#ifndef cpu_has_mxu
+#define cpu_has_mxu		(cpu_data[0].ases & MIPS_ASE_XBURSTMXU)
+#endif
+
 #ifndef cpu_has_userlocal
 #define cpu_has_userlocal	(cpu_data[0].options & MIPS_CPU_ULRI)
+#endif
+
+#ifndef cpu_has_contextconfig
+#define cpu_has_contextconfig	((cpu_data[0].options & MIPS_CPU_CTXTC) || cpu_has_smartmips)
 #endif
 
 #ifdef CONFIG_32BIT

@@ -31,6 +31,8 @@
 
 
 #define JZ4740_EMC_SDRAM_CTRL 0x80
+int coherentio;         /* init to 0, no DMA cache coherency */
+int hw_coherentio;      /* init to 0, no HW DMA cache coherency */
 
 
 static void __init jz4740_detect_mem(void)
@@ -57,7 +59,7 @@ static void __init jz4740_detect_mem(void)
 void __init plat_mem_setup(void)
 {
 	int offset;
-
+	set_io_port_base(IO_BASE);
 	jz4740_reset_init();
 	__dt_setup_arch(__dtb_start);
 
