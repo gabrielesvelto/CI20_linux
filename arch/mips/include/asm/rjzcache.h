@@ -86,7 +86,7 @@ do {						\
 do {						\
 	unsigned long tmp;			\
 	__asm__ __volatile__(			\
-	".set mips32\n\t"			\
+	".set mips32r2\n\t"			\
 	"mfc0 %0, $16, 7\n\t"			\
 	"nop\n\t"				\
 	"ori %0, 2\n\t"				\

@@ -254,7 +254,7 @@ config MACH_JZ4740
 
 config MACH_JZ4780
 	bool "Ingenic JZ4780 based machines"
-	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
 	select SYS_SUPPORTS_32BIT_KERNEL
 	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select SYS_SUPPORTS_ZBOOT_UART16550
@@ -272,7 +272,6 @@ config MACH_JZ4780
 	select USE_OF
 	select LIBFDT
 	select SYS_SUPPORTS_SMP
-	select CONFIG_XBURST_CACHE
 
 config LANTIQ
 	bool "Lantiq based platforms"
@@ -351,7 +350,6 @@ config MIPS_MALTA
 	select I8253
 	select I8259
 	select MIPS_BONITO64
-	select MIPS_CPU_SCACHE
 	select PCI_GT64XXX_PCI0
 	select MIPS_MSC
 	select SWAP_IO_SPACE
@@ -1619,7 +1617,6 @@ config CPU_BMIPS4380
 
 config CPU_BMIPS5000
 	bool
-	select MIPS_CPU_SCACHE
 	select SYS_SUPPORTS_SMP
 	select SYS_SUPPORTS_HOTPLUG_CPU
 
@@ -1930,13 +1927,21 @@ config IP22_CPU_SCACHE
 	bool
 	select BOARD_SCACHE
 
-#
-# Support for a MIPS32 / MIPS64 style S-caches
-#
+choice
+	prompt "Cache type"
+	default MIPS_CPU_SCACHE
+
 config MIPS_CPU_SCACHE
-	bool
+	bool "Support for a MIPS32 / MIPS64 style S-caches"
+	depends on (CPU_BMIPS5000 || MACH_JZ4780 || MIPS_MALTA)
 	select BOARD_SCACHE
 	select MIPS_L1_CACHE_SHIFT_6
+
+config XBURST_CACHE
+	bool "Support for Ingenic's Xburst cache"
+	depends on MACH_JZ4780
+
+endchoice
 
 config R5000_CPU_SCACHE
 	bool
@@ -1967,11 +1972,7 @@ config CPU_R4K_FPU
 
 config CPU_R4K_CACHE_TLB
 	bool
-	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON || MACH_JZ4780)
-
-config XBURST_CACHE
-	bool
-	default y if (MACH_JZ4780)
+	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON || (MACH_JZ4780 && XBURST_CACHE))
 
 config MIPS_MT_SMP
 	bool "MIPS MT SMP support (1 TC on each available VPE)"

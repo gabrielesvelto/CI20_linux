@@ -63,6 +63,8 @@ extern "C" {
 
 #include <linux/platform_device.h>
 
+#include<dt-bindings/clock/jzcpm_pwc.h>
+
 #define	PVR_XB47_TIMING_CPM
 
 #if !defined(NO_HARDWARE) && \
@@ -145,11 +147,6 @@ PVRSRV_ERROR SysDvfsInitialize(SYS_SPECIFIC_DATA *psSysSpecificData);
 PVRSRV_ERROR SysDvfsDeinitialize(SYS_SPECIFIC_DATA *psSysSpecificData);
 
 #define	PWC_GPU	"gpu"
-
-void *cpm_pwc_get(char *name);
-void cpm_pwc_put(void *handle);
-int cpm_pwc_enable(void *handle);
-int cpm_pwc_disable(void *handle);
 
 #if defined(__cplusplus)
 }

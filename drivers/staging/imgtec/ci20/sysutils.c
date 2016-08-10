@@ -68,37 +68,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 extern struct platform_device *gpsPVRLDMDev;
 
-/*
- * Stubs for cpm_pwc_* functions present in the Linux 3.0.8 kernel, but not
- * in 3.18.
- */
-
-void *cpm_pwc_get(char *name)
-{
-	(void) name;
-
-	return (void *)(uintptr_t)1;
-}
-
-void cpm_pwc_put(void *handle)
-{
-	(void) handle;
-}
-
-int cpm_pwc_enable(void *handle)
-{
-	(void) handle;
-
-	return 0;
-}
-
-int cpm_pwc_disable(void *handle)
-{
-	(void) handle;
-
-	return 0;
-}
-
 static PVRSRV_ERROR PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData, IMG_BOOL bTryLock)
 {
 	if (!in_interrupt())
