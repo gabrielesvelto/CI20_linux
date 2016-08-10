@@ -6,6 +6,10 @@
 
 targets		:= zImage uImage vmlinuz vmlinux.bin.gz head.o decompress.o piggy.o dummy.o
 
+# Disable Function Tracer
+KBUILD_CFLAGS := $(shell echo $(KBUILD_CFLAGS) | sed -e "s/-pg//")
+KBUILD_CFLAGS := $(filter-out -fstack-protector, $(KBUILD_CFLAGS))
+
 OBJS 		:= $(obj)/head.o $(obj)/decompress.o $(obj)/cache.o $(obj)/dbg.o
 
 ifdef CONFIG_DEBUG_ZBOOT
