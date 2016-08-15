@@ -32,7 +32,9 @@
 #define GPIO_MIC_SW_EN 174
 
 static struct snd_soc_jack ci20_hp_jack;
+#ifndef CONFIG_ANDROID
 static struct snd_soc_jack ci20_hdmi_jack;
+#endif
 
 static struct snd_soc_jack_pin ci20_hp_jack_pins[] = {
 	{
@@ -158,12 +160,14 @@ static int ci20_hdmi_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_enable_pin(dapm, "HDMI");
 
+#ifndef CONFIG_ANDROID
 	/* Enable headphone jack detection */
 	snd_soc_jack_new(codec, "HDMI Jack", SND_JACK_LINEOUT,
 			 &ci20_hdmi_jack);
 
 	/* Jack is connected (it just is) */
 	snd_soc_jack_report(&ci20_hdmi_jack, SND_JACK_LINEOUT, SND_JACK_LINEOUT);
+#endif
 	return 0;
 }
 
