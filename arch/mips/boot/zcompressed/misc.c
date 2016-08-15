@@ -10,8 +10,8 @@
  *
  */
 
-#include "base.h"
 #include "cache.h"
+#include "dbg.h"
 #include <asm/addrspace.h>
 #include <stdarg.h>
 
@@ -54,26 +54,8 @@ static unsigned outcnt = 0;  /* bytes in output buffer */
 
 #define get_byte()  (inptr < insize ? inbuf[inptr++] : fill_inbuf())
 
-/* Diagnostic functions */
-#ifdef DEBUG
-#  define Assert(cond,msg) {if(!(cond)) error(msg);}
-#  define Trace(x) fprintf x
-#  define Tracev(x) {if (verbose) fprintf x ;}
-#  define Tracevv(x) {if (verbose>1) fprintf x ;}
-#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
-#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
-#else
-#  define Assert(cond,msg)
-#  define Trace(x)
-#  define Tracev(x)
-#  define Tracevv(x)
-#  define Tracec(c,x)
-#  define Tracecv(c,x)
-#endif
-
 static int  fill_inbuf(void);
 static void flush_window(void);
-static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
 
@@ -90,137 +72,10 @@ static unsigned long output_ptr = 0;
 
 static void *malloc(int size);
 static void free(void *where);
-static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
 
-#if 1
-
-/*
- * Add puts func just for debug.
- * If it does not work,check the follows macro define.
- * Have a pleasant debug day.
- */
-
-static volatile int uart_base;
-
-#define OFF_LSR		(0x14)
-#define OFF_LCR		(0x0C)
-#define OFF_TDR		(0x00)
-#define UART_OFF	0x1000
-#define UART_LSR_TDRQ	(1 << 5)        /* 1: transmit FIFO half "empty" */
-#define UART_LSR_TEMT	(1 << 6)	/* 1: transmit FIFO and shift registers empty */
-
-void check_uart(void)
-{
-	volatile char *base = (volatile char*)CKSEG1ADDR(UART0_IOBASE);
-	int i;
-	for(i=0; i<4; i++) {
-		if(base[OFF_LCR])
-			break;
-		base += UART_OFF;
-	}
-
-	uart_base = (int)base;
-}
-
-static void serial_putc (const char c)
-{
-	volatile char *uart_lsr = (volatile char *)(uart_base + OFF_LSR);
-	volatile char *uart_tdr = (volatile char *)(uart_base + OFF_TDR);
-
-	if (c == '\n') serial_putc ('\r');
-
-	/* Wait for fifo to shift out some bytes */
-	while ( !((*uart_lsr & (UART_LSR_TDRQ | UART_LSR_TEMT)) == 0x60) );
-
-	*uart_tdr = (char)c;
-}
-static void puts(const char *s)
-{
-	while (*s) {
-		serial_putc (*s++);
-	}
-}
-
-static int hex2asc(int n)
-{
-    n &= 15;
-    if(n > 9){
-        return ('a' - 10) + n;
-    } else {
-        return '0' + n;
-    }
-}
-
-int printf(char *fmt,...)
-{
-   va_list ap;
-   char scratch[16];
-   va_start(ap,fmt);
-
-    for(;;){
-        switch(*fmt){
-        case 0:
-            va_end(ap);
-            return 0;
-        case '%':
-            switch(fmt[1]) {
-            case 'p':
-            case 'X':
-            case 'x': {
-                unsigned n = va_arg(ap, unsigned);
-                char *p = scratch + 15;
-                *p = 0;
-                do {
-                    *--p = hex2asc(n);
-                    n = n >> 4;
-                } while(n != 0);
-                while(p > (scratch + 7)) *--p = '0';
-		while (*p) serial_putc(*p++);
-                fmt += 2;
-                continue;
-            }
-            case 'd': {
-                int n = va_arg(ap, int);
-                char *p = scratch + 15;
-                *p = 0;
-                if(n < 0) {
-                    serial_putc('-');
-                    n = -n;
-                }
-                do {
-                    *--p = (n % 10) + '0';
-                    n /= 10;
-                } while(n != 0);
-		while (*p) serial_putc(*p++);
-                fmt += 2;
-                continue;
-            }
-            case 's': {
-                char *s = va_arg(ap, char*);
-                if(s == 0) s = "(null)";
-		while (*s) serial_putc(*s++);
-                fmt += 2;
-                continue;
-            }
-            }
-            serial_putc(*fmt++);
-            break;
-        case '\n':
-            serial_putc('\r');
-        default:
-            serial_putc(*fmt++);
-        }
-    }
-}
-
-
-#else
-static void puts(const char *str)
-{
-}
-#endif
+extern void puts(const char *s);
 
 extern unsigned char _end[];
 static unsigned long free_mem_ptr;
@@ -345,15 +200,6 @@ static void flush_window(void)
     outcnt = 0;
 }
 
-static void error(char *x)
-{
-	puts("\n\n");
-	puts(x);
-	puts("\n\n -- System halted");
-
-	while(1);	/* Halt */
-}
-
 void decompress_kernel(unsigned int imageaddr, unsigned int imagesize, unsigned int loadaddr)
 {
 	input_data = (char *)imageaddr;
@@ -363,7 +209,6 @@ void decompress_kernel(unsigned int imageaddr, unsigned int imagesize, unsigned 
 	free_mem_ptr = (unsigned long)_end;
 	free_mem_end_ptr = free_mem_ptr + HEAP_SIZE;
 
-	check_uart();
 	makecrc();
 	puts("Uncompressing Linux...\n");
 	gunzip();
