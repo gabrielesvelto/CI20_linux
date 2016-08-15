@@ -53,39 +53,4 @@ startup:
 
 	END(startup)
 
-
-	LEAF(flushcaches)
-	la	t0, 1f
-	la	t1, 0xa0000000
-	or	t0, t0, t1
-	jr	t0
-	nop
-1:
-	li	k0, 0x80000000  # start address
-	li	k1, 0x80008000  # end address (32KB I-Cache)
-	subu	k1, 128
-
-2:
-	.set mips3
-	cache	IndexWriteBack_D, 0(k0)
-	cache	IndexWriteBack_D, 32(k0)
-	cache	IndexWriteBack_D, 64(k0)
-	cache	IndexWriteBack_D, 96(k0)
-	cache	IndexInvalidate_I, 0(k0)
-	cache	IndexInvalidate_I, 32(k0)
-	cache	IndexInvalidate_I, 64(k0)
-	cache	IndexInvalidate_I, 96(k0)
-	.set mips0
-
-	bne	k0, k1, 2b
-	addu	k0, k0, 128
-	la	t0, 3f
-	jr	t0
-	nop
-	sync
-3:
-	jr	ra
-	nop
-	END(flushcaches)
-
 	.comm .stack,4096*2,4
