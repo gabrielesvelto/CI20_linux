@@ -4,9 +4,9 @@
 # create a compressed zImage from the original vmlinux
 #
 
-targets		:= zImage uImage vmlinuz vmlinux.bin.gz head.o misc.o piggy.o dummy.o
+targets		:= zImage uImage vmlinuz vmlinux.bin.gz head.o decompress.o piggy.o dummy.o
 
-OBJS 		:= $(obj)/head.o $(obj)/misc.o $(obj)/cache.o $(obj)/dbg.o
+OBJS 		:= $(obj)/head.o $(obj)/decompress.o $(obj)/cache.o $(obj)/dbg.o
 
 ifdef CONFIG_DEBUG_ZBOOT
 OBJS += $(obj)/uart-16550.o
