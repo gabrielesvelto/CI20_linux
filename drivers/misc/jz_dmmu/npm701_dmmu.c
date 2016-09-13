@@ -34,7 +34,7 @@ extern struct platform_device jz_dmmu_device;
 
 static struct jz_dmmu_platform_data jz_dmmu_platform_info = {
 	.name = DEV_NAME,
-	.page_table_pool_init_capacity = 4,
+	.page_table_pool_init_capacity = 2,
 	.start = 0,
 	.cached = 0,
 	.reserved_size = 0,
