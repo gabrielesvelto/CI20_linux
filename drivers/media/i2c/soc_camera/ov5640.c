@@ -1202,7 +1202,7 @@ static int ov5640_probe(struct i2c_client *client,
 				      sd_pdata->regulators);
 	if (ret) {
 		dev_err(&client->dev, "Failed to get supplies: %d\n", ret);
-		kfree(priv);
+		devm_kfree(&client->dev, priv);
 		return ret;
 	}
 
@@ -1260,8 +1260,8 @@ static int ov5640_probe(struct i2c_client *client,
 	ret = ov5640_video_probe(client);
 	if (ret) {
 		v4l2_ctrl_handler_free(&priv->hdl);
-		kfree(sd_pdata->regulators);
-		kfree(priv);
+		devm_kfree(&client->dev, sd_pdata->regulators);
+		devm_kfree(&client->dev, priv);
 		ret = -EPROBE_DEFER;
 	} else {
 		if (v4l2_ctrl_handler_setup(&priv->hdl) < 0)
@@ -1281,7 +1281,7 @@ static int ov5640_remove(struct i2c_client *client)
 {
 	struct ov5640_priv       *priv = to_ov5640(client);
 
-	kfree(priv);
+	devm_kfree(&client->dev, priv);
 	return 0;
 }
 
