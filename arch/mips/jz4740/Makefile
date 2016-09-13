@@ -5,7 +5,7 @@
 # Object file lists.
 
 obj-y += prom.o time.o reset.o setup.o \
-	platform.o timer.o
+	platform.o timer.o mxu.o
 
 obj-$(CONFIG_MACH_JZ4740) += gpio.o
 

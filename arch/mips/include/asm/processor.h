@@ -20,6 +20,8 @@
 #include <asm/mipsregs.h>
 #include <asm/prefetch.h>
 
+ #define NUM_MXU_REGS	16
+
 /*
  * Return current * instruction pointer ("program counter").
  */
@@ -35,6 +37,10 @@ extern unsigned int vced_count, vcei_count;
  * MIPS does have an arch_pick_mmap_layout()
  */
 #define HAVE_ARCH_PICK_MMAP_LAYOUT 1
+
+ struct xburst_mxu_struct {
+	unsigned int regs[NUM_MXU_REGS];
+};
 
 /*
  * A special page (the vdso) is mapped into all processes at the very
@@ -271,6 +277,8 @@ struct thread_struct {
 
 	/* Saved state of the DSP ASE, if available. */
 	struct mips_dsp_state dsp;
+
+	struct xburst_mxu_struct mxu;
 
 	/* Saved watch register state, if available. */
 	union mips_watch_reg_state watch;

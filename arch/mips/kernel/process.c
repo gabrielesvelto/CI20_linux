@@ -30,6 +30,7 @@
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
 #include <asm/dsp.h>
+#include <asm/mxu.h>
 #include <asm/fpu.h>
 #include <asm/msa.h>
 #include <asm/pgtable.h>
@@ -66,6 +67,10 @@ void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 	clear_used_math();
 	clear_fpu_owner();
 	init_dsp();
+
+	if (cpu_has_mxu)
+		__init_mxu();
+
 	clear_thread_flag(TIF_USEDMSA);
 	clear_thread_flag(TIF_MSA_CTX_LIVE);
 	disable_msa();
@@ -100,6 +105,9 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 
 	if (cpu_has_dsp)
 		save_dsp(p);
+
+	if (cpu_has_mxu)
+		save_mxu(p);
 
 	preempt_enable();
 
