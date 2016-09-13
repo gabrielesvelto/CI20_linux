@@ -791,8 +791,6 @@ static unsigned int get_out_fmt_rgb_order(int hal_out_fmt)
 	switch (hal_out_fmt) {
 		case HAL_PIXEL_FORMAT_RGBA_8888:
 		case HAL_PIXEL_FORMAT_RGBX_8888:
-			order = RGB_OUT_OFT_BGR;
-			break;
 		case HAL_PIXEL_FORMAT_RGB_888:
 		case HAL_PIXEL_FORMAT_RGB_565:
 		case HAL_PIXEL_FORMAT_BGRA_8888:
