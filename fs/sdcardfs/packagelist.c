@@ -349,12 +349,19 @@ static ssize_t packages_attr_show(struct config_item *item,
 	struct hashtable_entry *hash_cur;
 	struct hlist_node *h_t;
 	int i;
-	int count = 0;
-	mutex_lock(&pkgl_data_all->hashtable_lock);
-	hash_for_each_safe(pkgl_data_all->package_to_appid, i, h_t, hash_cur, hlist)
-		count += snprintf(page + count, PAGE_SIZE - count, "%s %d\n", (char *)hash_cur->key, hash_cur->value);
-	mutex_unlock(&pkgl_data_all->hashtable_lock);
+	int count = 0, written = 0;
+	char errormsg[] = "<truncated>\n";
 
+	mutex_lock(&pkgl_data_all->hashtable_lock);
+	hash_for_each_safe(pkgl_data_all->package_to_appid, i, h_t, hash_cur, hlist) {
+		written = scnprintf(page + count, PAGE_SIZE - sizeof(errormsg) - count, "%s %d\n", (char *)hash_cur->key, hash_cur->value);
+		if (count + written == PAGE_SIZE - sizeof(errormsg)) {
+			count += scnprintf(page + count, PAGE_SIZE - count, errormsg);
+			break;
+		}
+		count += written;
+	}
+	mutex_unlock(&pkgl_data_all->hashtable_lock);
 
 	return count;
 }
@@ -395,7 +402,7 @@ static struct configfs_subsystem sdcardfs_packages_subsys = {
 	},
 };
 
-static int __init configfs_sdcardfs_init(void)
+static int configfs_sdcardfs_init(void)
 {
 	int ret;
 	struct configfs_subsystem *subsys = &sdcardfs_packages_subsys;
@@ -411,7 +418,7 @@ static int __init configfs_sdcardfs_init(void)
 	return ret;
 }
 
-static void __exit configfs_sdcardfs_exit(void)
+static void configfs_sdcardfs_exit(void)
 {
 	configfs_unregister_subsystem(&sdcardfs_packages_subsys);
 }
