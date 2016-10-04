@@ -12,6 +12,8 @@
 #ifndef _ASM_R4KCACHE_H
 #define _ASM_R4KCACHE_H
 
+#include <linux/hardirq.h>		/* for preemptible() decl */
+
 #include <asm/asm.h>
 #include <asm/cacheops.h>
 #include <asm/cpu-features.h>
@@ -560,6 +562,10 @@ static inline void blast_dcache_jz(void)
 	unsigned long start = (unsigned long)reserved_for_alloccache;
 	unsigned long end = start + current_cpu_data.dcache.waysize * current_cpu_data.dcache.ways;
 	unsigned long addr = start;
+
+       if ( preemptible() )
+		panic("%s: preemptible!\n", __func__);
+
        do {
 		i_pref(JZ_ALLOC_PREF, addr, 0);i_lw(addr);i_cache(Hit_Invalidate_D,addr,0);addr += 32;
 		i_pref(JZ_ALLOC_PREF, addr, 0);i_lw(addr);i_cache(Hit_Invalidate_D,addr,0);addr += 32;
@@ -609,6 +615,31 @@ static inline void blast_icache_jz(void)
 		i_cache(JZ_FETCH_LOCK, addr, 0);i_cache(Hit_Invalidate_I,addr,0);
 		addr += 32;
 	} while (addr < end);
+
+	do {
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+		i_cache(Index_Load_Tag_I,start,0);
+		if(read_c0_dtaglo() & 1) {
+			i_cache(Index_Invalidate_I,start,0);
+		}
+		start += 32;
+	}while(start < end);
+
+	INVALIDATE_BTB();
 }
 
 static inline void blast_dcache32(void)
@@ -619,6 +650,9 @@ static inline void blast_dcache32(void)
 	unsigned long ws_end = current_cpu_data.dcache.ways <<
 	                       current_cpu_data.dcache.waybit;
 	unsigned long ws, addr;
+
+	if ( preemptible() )
+		panic("%s: preemptible!\n", __func__);
 
 	for (ws = 0; ws < ws_end; ws += ws_inc)
 		for (addr = start; addr < end; addr += 0x400)
@@ -800,7 +834,7 @@ static inline void protected_blast_icache_range(unsigned long start,
 	unsigned long aend = (end - 1) & ~(lsize - 1);
 
 	//	K0_TO_K1();
-	K0_TO_K1_CHECK(start,end);
+	//	K0_TO_K1_CHECK(start,end);
 
 	while (1) {
 		protected_cache_op(Hit_Invalidate_I, addr);
@@ -810,7 +844,7 @@ static inline void protected_blast_icache_range(unsigned long start,
 	}
 	INVALIDATE_BTB();
 
-	K1_TO_K0();
+	//	K1_TO_K0();
 }
 
 static inline void blast_dcache_range(unsigned long start,

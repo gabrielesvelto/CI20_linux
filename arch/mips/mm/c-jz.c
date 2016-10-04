@@ -56,6 +56,19 @@ static inline void r4k_on_each_cpu(void (*func) (void *info), void *info)
 	preempt_enable();
 }
 
+static inline void r4k_on_other_cpu(void (*func) (void *info), void *info)
+{
+#if !defined(CONFIG_MIPS_MT_SMP) && !defined(CONFIG_MIPS_MT_SMTC)
+	preempt_disable();
+	smp_call_function(func, info, 1);
+	preempt_enable();
+#endif
+}
+
+/*
+ * Data cache index ops are likely safe, but,
+ * Instruction cache index ops are not safe.
+ */
 #if defined(CONFIG_MIPS_CMP)
 #define cpu_has_safe_index_cacheops 0
 #else
@@ -144,7 +157,28 @@ static void (* r4k_blast_dcache)(void);
 static void __cpuinit r4k_blast_dcache_setup(void)
 {
 	unsigned long dc_lsize = cpu_dcache_line_size();
+	/*
+	 * NOTE:
+	 *	blast_dcache_jz():
+	 *	    Special Ingenic version that tried to flush the data cache with
+	 *	    Address cache op Hit_Invalidate_D used to avoid flushing
+	 *	    additional ways.
+	 *
+	 *	blast_dcache32():
+	 *	    Generic code that flushes the compelte ways with Index cashe op
+	 *	    Index_Writeback_Inv_D. expected to be slower do to flushing
+	 *	    more ways than necessary and apparently flushing both L1 and
+	 *	    L2 caches.
+	 *
+	 *	Test results with WebView APK using r4k_flush_icache_range():
+	 *		blast_dcache32()  AND blast_icache32():    2.5s   [BETTER]
+	 *		blast_dcache_jz() AND blast_dcache_jz():   6.0s
+	 */
+#if 0
 	r4k_blast_dcache_jz = blast_dcache_jz;
+#else
+	r4k_blast_dcache_jz = blast_dcache32;
+#endif
 	if (dc_lsize == 0)
 		r4k_blast_dcache = (void *)cache_noop;
 	else if (dc_lsize == 16)
@@ -273,7 +307,16 @@ static void (* r4k_blast_icache)(void);
 static void __cpuinit r4k_blast_icache_setup(void)
 {
 	unsigned long ic_lsize = cpu_icache_line_size();
+
+	/*
+	 * blast_icache32() likely faster than blast_icache_jz().
+	 * See note above in r4k_blast_dcache_setup().
+	 */
+#if 0
 	r4k_blast_icache_jz = blast_icache_jz;
+#else
+	r4k_blast_icache_jz = blast_icache32;
+#endif
 	if (ic_lsize == 0)
 		r4k_blast_icache = (void *)cache_noop;
 	else if (ic_lsize == 16)
@@ -635,19 +678,24 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 #else
 static inline void local_r4k_flush_icache_range(unsigned long start, unsigned long end)
 {
+	preempt_disable();
+
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			r4k_blast_dcache_jz();
+			r4k_blast_dcache();
 		} else {
 			R4600_HIT_CACHEOP_WAR_IMPL;
+			BUG_ON(preemptible());
 			protected_blast_dcache_range(start, end);
 		}
 	}
 
-	if (end - start > icache_size)
-		r4k_blast_icache_jz();
+	if (end - start >= icache_size)
+		r4k_blast_icache();
 	else
 		protected_blast_icache_range(start, end);
+
+	preempt_enable();
 }
 static inline void local_r4k_flush_icache_jz_ipi(void *args){
 	r4k_blast_icache_jz();
@@ -655,22 +703,266 @@ static inline void local_r4k_flush_icache_jz_ipi(void *args){
 static inline void local_r4k_flush_dcache_jz_ipi(void *args){
 	r4k_blast_dcache_jz();
 }
+
+
+/*
+ * Logging function for the next two cache flushing functions:
+ */
+#define LOG_INFO() {                                                                     \
+    printk("%s(args:%p->{start:0x%lx, end:0x%lx}): ...\n", __func__, args, start, end);  \
+                                                                                         \
+    printk("   ... cpu:%d, start:%#lx, (end-start):%#lx\n",                              \
+                   cpu,    start,      (end-start));                                     \
+                                                                                         \
+    printk("   ... effective_addr_mask:0x%lx, cache_lines:%d\n\n",                       \
+                   effective_addr_mask,       cache_lines);                              \
+}
+
+/* Waiting for confirmation from Jun Jiang. */
+#define DCACHE_ADDRESS_CACHE_OPS_BROADCAST_TO_COHERENT_CACHES 1
+
+#if !DCACHE_ADDRESS_CACHE_OPS_BROADCAST_TO_COHERENT_CACHES
+/*
+ * The other CPU may be running a different process (different ASID) with different address
+ * mappings, however flushing the local dcache all with local_r4k_flush_dcache_ipi() is safe
+ * as the addresses are mapped on the local CPU.
+ *
+ * But local_r4k_flush_dcache_ipi() flushes dcache with all indices, flushing both L1 dcache
+ * and L2 cache this decreases the machine performance (2x ... 3x). So here we optimised the
+ * procedure by flushing to memory each of the ways of each cache line that could match
+ * addresses being flushed.  Only the way and index bits are significant.
+ *
+ * This functions is only needed if the dcache_hit_writeback_invalidate cache op doesn't
+ * broadcast to other coherant caches.
+ */
+static inline void protected_blast_other_cpu_dcache_range_ipi(void *args)
+{
+	struct flush_icache_range_args *addrp = (struct flush_icache_range_args *)args;
+	unsigned long dc_mask = dcache_size - 1;
+	unsigned int cpu = smp_processor_id();
+	unsigned long effective_addr_mask;
+	unsigned long start = addrp->start;
+	unsigned long end = addrp->end;
+	static int log_info = 0;
+	unsigned long dc_lsize;
+	unsigned long dc_lmask;
+	int sanity_count = 0;
+	unsigned long addr;
+	int cache_lines;
+
+	if ( preemptible() )
+		panic("%s: preemptible!\n", __func__);
+
+	dc_lsize = cpu_dcache_line_size();
+	dc_lmask = ~(dc_lsize - 1);
+	cache_lines = (dcache_size / dc_lsize);
+        effective_addr_mask = dc_mask & dc_lmask;
+
+	if (log_info > 0) {
+		LOG_INFO();
+		log_info--;
+	}
+	for (addr = start; addr <= end; addr += dc_lsize) {
+		unsigned long effective_addr;
+
+		/* Using KSEG0 (INDEX_BASE:0x8000,0000) which is always mapped */
+		effective_addr = (addr & effective_addr_mask) | INDEX_BASE;
+
+		/*
+		 * Flush each way for the current index to memory.
+		 *
+		 * NOTE: For the Ingenic 4780 this instruction flushes both the
+		 *       the 1st level data and the general 2nd level cache lines.
+		 *	 For MIPS this instruction typically only flushes the
+		 *       1st level data cache.
+		 */
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x0));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x1000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x2000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x3000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x4000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x5000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x6000));
+		protected_cache_op(Index_Writeback_Inv_D, (effective_addr + 0x7000));
+
+		if (sanity_count++ > cache_lines) {
+			LOG_INFO();
+			panic(__func__);
+			/* NOTREACHED */
+		}
+	}
+	SYNC_WB();
+}
+#endif
+
+/*
+ * The other CPU may be running a different process (different ASID) with different address
+ * mappings, however flushing the local icache all with local_r4k_flush_icache_ipi() is safe
+ * as the addresses are mapped on the local CPU.
+ *
+ * But local_r4k_flush_icache_ipi() flushes icache with all indices, flushing both L1 icache
+ * and L2 cache this decreases the machine performance (2x ... 3x). So here we optimised the
+ * procedure by flushing to memory each of the ways of each cache line that could match
+ * addresses being flushed.  Only the way and index bits are significant.
+ *
+ * I-Cache isn't coherant so local address cache ops are not broadcast. From Ingenic:
+ * 	"For JZ4780, coherence implementation is only available among local cores' dcache.
+ *	 While coherence problem among different cores' icache has to be solved by software.
+ *	 Thus, for SYNCI, it flushes only the icache on the local core."
+ */
+static inline void protected_blast_other_cpu_icache_range_ipi(void *args)
+{
+	struct flush_icache_range_args *addrp = (struct flush_icache_range_args *)args;
+	unsigned long ic_mask = icache_size - 1;
+	unsigned int cpu = smp_processor_id();
+	unsigned long effective_addr_mask;
+	unsigned long start = addrp->start;
+	unsigned long end = addrp->end;
+	static int log_info = 0;
+	unsigned long ic_lsize;
+	unsigned long ic_lmask;
+	int sanity_count = 0;
+	unsigned long addr;
+	int cache_lines;
+
+	if ( preemptible() )
+		printk("%s: preemptible!\n", __func__);
+
+	ic_lsize = cpu_icache_line_size();
+	ic_lmask = ~(ic_lsize - 1);
+	cache_lines = (icache_size / ic_lsize);
+	effective_addr_mask = ic_mask & ic_lmask;
+
+	if (log_info > 0) {
+		LOG_INFO();
+		log_info--;
+	}
+	for (addr = start; addr <= end; addr += ic_lsize) {
+		unsigned long effective_addr;
+
+		/* Using KSEG0 (INDEX_BASE:0x8000,0000) which is always mapped */
+		effective_addr = (addr & effective_addr_mask) | INDEX_BASE;
+
+		/*
+		 * Flush each way for the current index to memory.
+		 */
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x0));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x1000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x2000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x3000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x4000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x5000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x6000));
+		protected_cache_op(Index_Invalidate_I, (effective_addr + 0x7000));
+
+		if (sanity_count++ > cache_lines) {
+			LOG_INFO();
+			panic(__func__);
+			/* NOTREACHED */
+		}
+	}
+	INVALIDATE_BTB();
+}
+
+/*
+ * Test results on 22-Nov-2013:
+ * ----------------------------
+ * Selective flushing of a short range of addresses via:
+ *
+ *	protected_blast_other_cpu_icache_range_ipi()
+ * and
+ *	protected_blast_other_cpu_dcache_range_ipi()
+ *
+ * is now stable with the addition of disabling pre-emption and is
+ * 2x to 3x faster with browser than flushing the complete dcache
+ * and icache on other CPUs with:
+ *
+ *	local_r4k_flush_dcache_jz_ipi()
+ * and
+ *	local_r4k_flush_icache_jz_ipi().
+ *
+ * flushtest is rock solid.
+ *
+ * Processor must not be preemptible while doing cache flush operations;
+ * and needs to be disable here as we all called direclty from a system call:
+ *
+ * sys_cacheflush() {
+ *    flush_icache_range() --> r4k_flush_icache_range() {
+ *        r4k_flush_icache_range(); 				YOUR ARE HERE
+ *    }
+ * }
+ */
 static void r4k_flush_icache_range(unsigned long start, unsigned long end)
 {
+	preempt_disable();
+
 	if (!cpu_has_ic_fills_f_dc) {
 		if (end - start >= dcache_size) {
-			//r4k_blast_dcache_jz();
-			r4k_on_each_cpu(local_r4k_flush_dcache_jz_ipi,0);
+			/* Flush complete dcache on all CPUs */
+			local_r4k_flush_dcache_jz_ipi(NULL);
+#if !DCACHE_ADDRESS_CACHE_OPS_BROADCAST_TO_COHERENT_CACHES
+			smp_call_function(local_r4k_flush_dcache_jz_ipi, 0, 1);
+#endif
 		} else {
-			R4600_HIT_CACHEOP_WAR_IMPL;
+			/*
+			 * Flush dcache by address on this CPU;
+			 * likely broadcast to other cores.
+			 */
+			BUG_ON(preemptible());
 			protected_blast_dcache_range(start, end);
+
+#if !DCACHE_ADDRESS_CACHE_OPS_BROADCAST_TO_COHERENT_CACHES
+			/*
+			 * This can likely be dropped/disabled; as implemented by Stephen Qiu.
+			 */
+			if ( (end-start < current_cpu_data.dcache.waysize)) {
+				/* Flush dcache_range by index on other CPUs */
+				struct flush_icache_range_args range_addr;
+				range_addr.start = start;
+				range_addr.end = end;
+				smp_call_function(protected_blast_other_cpu_dcache_range_ipi,
+							&range_addr, 1);
+			}
+			else {
+				/* Flush complete dcache on other CPUs */
+				smp_call_function(local_r4k_flush_dcache_jz_ipi, 0, 1);
+			}
+#endif
 		}
 	}
 
-	if (end - start > icache_size)
-		r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
-	else
+	if (end - start >= icache_size) {
+		/* Flush complete icache on all CPUs
+		 *
+		 * Already did preempt_disable() at function entry,
+		 * not necessary to issue a call to r4k_on_each_cpu().
+		 */
+		// r4k_on_each_cpu(local_r4k_flush_icache_jz_ipi,0);
+		local_r4k_flush_icache_jz_ipi(NULL);
+		smp_call_function(local_r4k_flush_icache_jz_ipi, 0, 1);
+	}
+	else {
+		/*
+		 * Flush icache by address on this CPU;
+		 * NOT broadcast to other cores.
+		 */
+		BUG_ON(preemptible());
 		protected_blast_icache_range(start, end);
+
+		if ( (end-start < current_cpu_data.icache.waysize)) {
+			/* Flush icache_range by index on other CPUs */
+			struct flush_icache_range_args range_addr;
+			range_addr.start = start;
+			range_addr.end = end;
+			smp_call_function(protected_blast_other_cpu_icache_range_ipi,
+						&range_addr, 1);
+		}
+		else {
+			/* Flush complete icache on other CPUs */
+			smp_call_function(local_r4k_flush_icache_jz_ipi, 0, 1);
+		}
+        }
+	preempt_enable();
 }
 #endif
 
