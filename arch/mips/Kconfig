@@ -25,6 +25,8 @@ config MIPS
 	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
 	select HAVE_ARCH_JUMP_LABEL
+	select HAVE_ARCH_MMAP_RND_BITS if MMU
+	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
 
 menu "Machine selection"
 
@@ -2487,6 +2489,20 @@ config TC
 config MMU
 	bool
 	default y
+
+config ARCH_MMAP_RND_BITS_MIN
+	default 10 if MIPS64
+	default 8
+
+config ARCH_MMAP_RND_BITS_MAX
+	default 18 if MIPS64
+	default 15
+
+config ARCH_MMAP_RND_COMPAT_BITS_MIN
+       default 8
+
+config ARCH_MMAP_RND_COMPAT_BITS_MAX
+       default 15
 
 config I8253
 	bool

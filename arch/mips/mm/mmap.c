@@ -222,14 +222,15 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	unsigned long random_factor = 0UL;
 
 	if (current->flags & PF_RANDOMIZE) {
-		random_factor = get_random_int();
-		random_factor = random_factor << PAGE_SHIFT;
+#ifdef CONFIG_COMPAT
 		if (TASK_IS_32BIT_ADDR)
-			random_factor &= 0xfffffful;
+			random_factor = get_random_int() & ((1UL << mmap_rnd_compat_bits) - 1);
 		else
-			random_factor &= 0xffffffful;
+#endif /* CONFIG_COMPAT */
+			random_factor = get_random_int() & ((1UL << mmap_rnd_bits) - 1);
 	}
 
+	random_factor = random_factor << PAGE_SHIFT;
 	if (mmap_is_legacy()) {
 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
 		mm->get_unmapped_area = arch_get_unmapped_area;
