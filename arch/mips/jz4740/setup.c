@@ -21,6 +21,7 @@
 #include <linux/libfdt.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#include <linux/vmalloc.h>
 
 #include <asm/bootinfo.h>
 #include <asm/prom.h>
@@ -80,6 +81,35 @@ static int __init populate_machine(void)
 	return 0;
 }
 arch_initcall(populate_machine);
+
+#ifdef CONFIG_MACH_JZ4780
+#define CPU_TCSM_BASE	0xf4000000
+/*
+ * Actual TCSM size iz 16K, but due to lazy decoding of 8 highest bits
+ * we have to reserve 16M range instead.
+ */
+#define CPU_TCSM_SIZE	0x1000000
+#define CPU_TCSM_BORDER	CPU_TCSM_BASE + CPU_TCSM_SIZE
+#define CPU_TCSM_END	CPU_TCSM_BORDER - 1
+
+static int __init reserve_tcsm_vm_area_range(void)
+{
+	struct vm_struct *area;
+	area = __get_vm_area(CPU_TCSM_SIZE - PAGE_SIZE, 0, CPU_TCSM_BASE,
+		CPU_TCSM_BORDER);
+
+	if (area == 0) {
+		printk("Failed to reserve TCSM vm area range %x-%x\n",
+			CPU_TCSM_BASE, CPU_TCSM_END);
+		return -ENOMEM;
+	}
+
+	printk("Successfully reserved TCSM vm area range %x-%x\n",
+			CPU_TCSM_BASE, CPU_TCSM_END);
+	return 0;
+}
+arch_initcall(reserve_tcsm_vm_area_range);
+#endif
 
 const char *get_system_type(void)
 {
