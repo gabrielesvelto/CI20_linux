@@ -498,6 +498,13 @@ static int jz4780_dma_terminate_all(struct jz4780_dma_chan *jzchan)
 	return 0;
 }
 
+static void jz4780_dma_synchronize(struct dma_chan *c)
+{
+	struct jz4780_dma_chan *chan = to_jz4780_dma_chan(c);
+
+	vchan_synchronize(&chan->vchan);
+}
+
 static int jz4780_dma_slave_config(struct jz4780_dma_chan *jzchan,
 	const struct dma_slave_config *config)
 {
@@ -769,6 +776,8 @@ static int jz4780_dma_probe(struct platform_device *pdev)
 	dd->device_control = jz4780_dma_control;
 	dd->device_tx_status = jz4780_dma_tx_status;
 	dd->device_issue_pending = jz4780_dma_issue_pending;
+	dd->device_synchronize = jz4780_dma_synchronize;
+	dd->device_terminate_all = jz4780_dma_terminate_all;
 
 	/*
 	 * Enable DMA controller, mark all channels as not programmable.
