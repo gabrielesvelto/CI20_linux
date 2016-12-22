@@ -280,6 +280,13 @@ struct thread_struct {
 
 	struct xburst_mxu_struct mxu;
 
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+	#define CPU_MIPS			0
+	#define CPU_ARM				1
+	#define CPU_ARM_NEON		2
+	unsigned int mcflags;
+#endif
+
 	/* Saved watch register state, if available. */
 	union mips_watch_reg_state watch;
 
