@@ -715,6 +715,13 @@ void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
 	otgctl &= ~GOTGCTL_HSTSETHNPEN;
 	writel(otgctl, hsotg->regs + GOTGCTL);
 
+#ifdef CONFIG_USB_DWC2_DISABLE_VOD
+	otgctl = readl(hsotg->regs + GOTGCTL);
+	otgctl |= GOTGCTL_VB_VALID_OV_VAL;
+	otgctl |= GOTGCTL_VB_VALID_OV_EN;
+	writel(otgctl, hsotg->regs + GOTGCTL);
+#endif
+
 	if (hsotg->core_params->dma_desc_enable <= 0) {
 		int num_channels, i;
 		u32 hcchar;
