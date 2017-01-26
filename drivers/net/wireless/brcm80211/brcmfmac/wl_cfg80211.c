@@ -2407,7 +2407,7 @@ static s32 brcmf_inform_single_bss(struct brcmf_cfg80211_info *cfg,
 	bss = cfg80211_inform_bss(wiphy, notify_channel,
 				  CFG80211_BSS_FTYPE_UNKNOWN,
 				  (const u8 *)bi->BSSID,
-				  0, notify_capability,
+				  ktime_to_us(ktime_get()), notify_capability,
 				  notify_interval, notify_ie,
 				  notify_ielen, notify_signal,
 				  GFP_KERNEL);
