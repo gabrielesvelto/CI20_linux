@@ -1533,6 +1533,34 @@ out_unlock:
 	return err;
 }
 
+long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
+{
+	int ret = 0;
+	struct iattr attr;
+	struct ubifs_info *c;
+	loff_t new_size = offset + len;
+
+	switch (mode) {
+	case 0:
+		if (new_size > file_inode(file)->i_size) {
+			attr.ia_size = new_size;
+			attr.ia_valid = ATTR_SIZE;
+
+			ret = ubifs_setattr(file->f_path.dentry, &attr);
+			if (ret) {
+				c = file_inode(file)->i_sb->s_fs_info;
+				ubifs_err(c, "failed to set size attribute");
+			}
+		}
+
+		break;
+	default:
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
 static const struct vm_operations_struct ubifs_file_vm_ops = {
 	.fault        = filemap_fault,
 	.map_pages = filemap_map_pages,
@@ -1592,6 +1620,7 @@ const struct file_operations ubifs_file_operations = {
 	.unlocked_ioctl = ubifs_ioctl,
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
+	.fallocate	= ubifs_fallocate,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = ubifs_compat_ioctl,
 #endif
