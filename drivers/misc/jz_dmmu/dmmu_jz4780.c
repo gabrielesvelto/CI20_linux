@@ -230,7 +230,9 @@ again:
 		paddr = get_phy_addr((unsigned int)addr, 1);
 		if (!paddr) {
 			void *tmp_vaddr = jz_dmmu.dummy_page_vbase;
+			up_write(&current->mm->mmap_sem);
 			memcpy(tmp_vaddr, addr, PAGE_SIZE>>4);
+			down_write(&current->mm->mmap_sem);
 			goto again;
 		}
 		if (i == 0)
