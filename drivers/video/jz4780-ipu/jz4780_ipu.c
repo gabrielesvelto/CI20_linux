@@ -1112,6 +1112,7 @@ static int ipu_init(struct jz_ipu *ipu, struct ipu_img_param *imgp, struct file 
 	ret = jz47_ipu_init(ipu, img);
 	if (ret < 0) {
 		dev_err(ipu->dev, "jz47_ipu_init failed\n");
+		clk_disable(ipu->clk);
 		mutex_unlock(&ipu->lock);
 		return ret;
 	}
@@ -1727,9 +1728,10 @@ static int ipu_release(struct inode *inode, struct file *filp)
 		return -EFAULT;
 	}
 
-	if (ipu->proc_num == 0)
-            clk_disable(ipu->clk);
-	ipu->inited = 0;
+	if (ipu->proc_num == 0 && ipu->inited) {
+		clk_disable(ipu->clk);
+		ipu->inited = 0;
+	}
 
 	mutex_unlock(&ipu->lock);
 
