@@ -583,6 +583,19 @@ static long vol_cdev_ioctl(struct file *file, unsigned int cmd,
 		break;
 	}
 
+#ifdef CONFIG_ANDROID
+	case BLKROSET:
+		/*
+		 * BLKROSET ioctl is called when executing "adb remount" command
+		 * regardless of filesystem type. Android assumes that it is running
+		 * on a block device.
+		 *
+		 * Leave the implementation empty and do not report any error here
+		 * in order to make "adb remount" functional.
+		 */
+		return 0;
+#endif
+
 	default:
 		err = -ENOTTY;
 		break;
