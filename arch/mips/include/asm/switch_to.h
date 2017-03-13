@@ -17,6 +17,7 @@
 #include <asm/dsp.h>
 #include <asm/cop2.h>
 #include <asm/msa.h>
+#include <asm/mxu.h>
 
 struct task_struct;
 
@@ -87,6 +88,8 @@ do {									\
 	__mips_mt_fpaff_switch_to(prev);				\
 	if (cpu_has_dsp)						\
 		__save_dsp(prev);					\
+	if (cpu_has_mxu)						\
+		__save_mxu(prev);					\
 	if (cop2_present && (KSTK_STATUS(prev) & ST0_CU2)) {		\
 		if (cop2_lazy_restore)					\
 			KSTK_STATUS(prev) &= ~ST0_CU2;			\
@@ -116,6 +119,8 @@ do {									\
 	}								\
 	if (cpu_has_dsp)						\
 		__restore_dsp(current);					\
+	if (cpu_has_mxu)						\
+		__restore_mxu(current);					\
 	if (cpu_has_userlocal)						\
 		write_c0_userlocal(current_thread_info()->tp_value);	\
 	__restore_watch();						\
