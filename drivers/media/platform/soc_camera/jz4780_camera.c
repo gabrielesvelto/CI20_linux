@@ -265,6 +265,39 @@ struct jz4780_camera_dev {
 	void __iomem *dma_desc_paddr;
 };
 
+static inline void jz4780_camera_disable(struct jz4780_camera_dev *pcdev)
+{
+	unsigned long temp;
+
+	/* disable dma and cim */
+	temp = readl(pcdev->base + CIM_CTRL);
+	temp &= ~(CIM_CTRL_DMA_EN | CIM_CTRL_ENA);
+	writel(temp, pcdev->base + CIM_CTRL);
+
+	writel(0, pcdev->base + CIM_STATE);
+}
+
+static inline void jz4780_camera_enable(struct jz4780_camera_dev *pcdev)
+{
+	unsigned long temp;
+
+	writel(0, pcdev->base + CIM_STATE);
+
+	/* clear rx fifo */
+	temp = readl(pcdev->base + CIM_CTRL);
+	temp |= CIM_CTRL_RXF_RST;
+	writel(temp, pcdev->base + CIM_CTRL);
+
+	temp = readl(pcdev->base + CIM_CTRL);
+	temp &= ~CIM_CTRL_RXF_RST;
+	writel(temp, pcdev->base + CIM_CTRL);
+
+	/* enable dma and cim */
+	temp = readl(pcdev->base + CIM_CTRL);
+	temp |= CIM_CTRL_DMA_EN | CIM_CTRL_ENA;
+	writel(temp, pcdev->base + CIM_CTRL);
+}
+
 static void cim_dump_reg(struct jz4780_camera_dev *pcdev)
 {
 	struct device *dev = pcdev->soc_host.v4l2_dev.dev;
@@ -446,12 +479,7 @@ static int jz4780_camera_setup_dma(struct jz4780_camera_dev *pcdev,
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	/* disable dma and cim */
-	regval = readl(pcdev->base + CIM_CTRL);
-	regval &= ~(CIM_CTRL_ENA | CIM_CTRL_DMA_EN);
-	writel(regval, pcdev->base + CIM_CTRL);
-
-	writel(0, pcdev->base + CIM_STATE);
+	jz4780_camera_disable(pcdev);
 
 	dma_desc = pcdev->dma_desc;
 
@@ -513,10 +541,7 @@ static int jz4780_camera_setup_dma(struct jz4780_camera_dev *pcdev,
 	dev_vdbg(dev, "%s Registers before enable\n", __func__);
 	cim_dump_reg(pcdev);
 
-	/* enable dma and cim */
-	regval = readl(pcdev->base + CIM_CTRL);
-	regval |= CIM_CTRL_DMA_EN | CIM_CTRL_ENA;
-	writel(regval, pcdev->base + CIM_CTRL);
+	jz4780_camera_enable(pcdev);
 
 	dev_vdbg(dev, "%s Registers after enable\n", __func__);
 	cim_dump_reg(pcdev);
@@ -632,8 +657,6 @@ static void jz4780_camera_clock_stop(struct soc_camera_host *ici)
 
 	dev_dbg(ici->v4l2_dev.dev, "Stop clock\n");
 
-	writel(0, pcdev->base + CIM_STATE);
-
 	/* disable end of frame interrupt */
 	temp = readl(pcdev->base + CIM_IMR);
 	temp |= CIM_IMR_EOFM;
@@ -644,24 +667,7 @@ static void jz4780_camera_clock_stop(struct soc_camera_host *ici)
 	temp |= CIM_IMR_RFIFO_OFM;
 	writel(temp, pcdev->base + CIM_IMR);
 
-	/* disable dma */
-	temp = readl(pcdev->base + CIM_CTRL);
-	temp &= ~CIM_CTRL_DMA_EN;
-	writel(temp, pcdev->base + CIM_CTRL);
-
-	/* clear rx fifo */
-	temp = readl(pcdev->base + CIM_CTRL);
-	temp |= CIM_CTRL_RXF_RST;
-	writel(temp, pcdev->base + CIM_CTRL);
-
-	temp = readl(pcdev->base + CIM_CTRL);
-	temp &= ~CIM_CTRL_RXF_RST;
-	writel(temp, pcdev->base + CIM_CTRL);
-
-	/* disable cim */
-	temp = readl(pcdev->base + CIM_CTRL);
-	temp &= ~CIM_CTRL_ENA;
-	writel(temp, pcdev->base + CIM_CTRL);
+	jz4780_camera_disable(pcdev);
 
 	if (pcdev->clk)
 		clk_disable(pcdev->clk);
@@ -1003,10 +1009,7 @@ static void jz4780_camera_wakeup(struct jz4780_camera_dev *pcdev,
 	wake_up(&vb->done);
 
 	if (list_empty(&pcdev->capture)) {
-		/* disable cim */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp &= ~(CIM_CTRL_ENA | CIM_CTRL_DMA_EN);
-		writel(temp, pcdev->base + CIM_CTRL);
+		jz4780_camera_disable(pcdev);
 
 		dev_dbg(icd->parent, "No more buffers - disable CIM\n");
 
@@ -1054,27 +1057,8 @@ static irqreturn_t jz4780_camera_irq_handler(int irq, void *data)
 		temp &= ~CIM_STATE_RXF_OF;
 		writel(temp, pcdev->base + CIM_STATE);
 
-		/* disable cim */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp &= ~CIM_CTRL_ENA;
-		writel(temp, pcdev->base + CIM_CTRL);
-
-		/* clear rx fifo */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp |= CIM_CTRL_RXF_RST;
-		writel(temp, pcdev->base + CIM_CTRL);
-
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp &= ~CIM_CTRL_RXF_RST;
-		writel(temp, pcdev->base + CIM_CTRL);
-
-		/* clear status register */
-		writel(0, pcdev->base + CIM_STATE);
-
-		/* enable cim */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp |= CIM_CTRL_ENA;
-		writel(temp, pcdev->base + CIM_CTRL);
+		jz4780_camera_disable(pcdev);
+		jz4780_camera_enable(pcdev);
 
 		return IRQ_HANDLED;
 	}
@@ -1114,20 +1098,14 @@ static irqreturn_t jz4780_camera_irq_handler(int irq, void *data)
 	if (status & CIM_STATE_SIZE_ERR) {
 		dev_warn(icd->parent, "Frame size error!\n");
 
-		/* disable cim */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp &= ~CIM_CTRL_ENA;
-		writel(temp, pcdev->base + CIM_CTRL);
+		jz4780_camera_disable(pcdev);
 
 		/* clear frame size error interrupt status */
 		temp = readl(pcdev->base + CIM_STATE);
 		temp &= ~CIM_STATE_SIZE_ERR;
 		writel(temp, pcdev->base + CIM_STATE);
 
-		/* enable cim */
-		temp = readl(pcdev->base + CIM_CTRL);
-		temp |= CIM_CTRL_ENA;
-		writel(temp, pcdev->base + CIM_CTRL);
+		jz4780_camera_enable(pcdev);
 
 		return IRQ_HANDLED;
 	}
