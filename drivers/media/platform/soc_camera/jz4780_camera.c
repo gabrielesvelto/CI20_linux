@@ -469,7 +469,7 @@ static int jz4780_camera_setup_dma(struct jz4780_camera_dev *pcdev,
 	dma_desc->buf = dma_address;
 
 	/* Next descriptor points to itself */
-	dma_desc->next = (dma_addr_t) (pcdev->dma_desc);
+	dma_desc->next = (dma_addr_t) (pcdev->dma_desc_paddr);
 
 	if (icd->current_fmt->host_fmt->fourcc == V4L2_PIX_FMT_YUYV) {
 		dma_desc->cmd = icd->sizeimage >> 2 | CIM_CMD_EOFINT |
