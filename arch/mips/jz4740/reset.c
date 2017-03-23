@@ -13,6 +13,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/pm.h>
@@ -21,6 +22,8 @@
 
 #include <asm/mach-jz4740/base.h>
 #include <asm/mach-jz4740/timer.h>
+#include <dt-bindings/soc/base.h>
+#include <dt-bindings/soc/cpm.h>
 
 #include "reset.h"
 #include "clock.h"
@@ -41,9 +44,41 @@ static void jz4740_halt(void)
 #define JZ_REG_WDT_COUNTER 0x08
 #define JZ_REG_WDT_CTRL 0x0c
 
+#define RECOVERY_SIGNATURE	(0x001a1a)
+#define REBOOT_SIGNATURE	(0x003535)
+#define BOOTLOADER_SIGNATURE	(0x004242)
+
 static void jz4740_restart(char *command)
 {
 	void __iomem *wdt_base = ioremap(JZ4740_WDT_BASE_ADDR, 0x0f);
+
+	if (command) {
+		unsigned int signature_value;
+		char *signature_name;
+
+		if (!strcmp(command, "recovery")) {
+			signature_value = RECOVERY_SIGNATURE;
+			signature_name = "recovery";
+		}
+		else if (!strcmp(command, "bootloader")) {
+			signature_value = BOOTLOADER_SIGNATURE;
+			signature_name = "bootloader";
+		} else {
+			signature_value = REBOOT_SIGNATURE;
+			signature_name = "reboot";
+		}
+
+		/*
+		 * FIXME: is it really necessary to retry this?
+		 */
+		do {
+			printk("set %s signature 0x%08x\n", signature_name, signature_value);
+			cpm_outl(0x5a5a, CPM_CPSPPR);
+			cpm_outl(signature_value, CPM_CPPSR);
+			cpm_outl(0x0, CPM_CPSPPR);
+			udelay(100);
+		} while (cpm_inl(CPM_CPPSR) != signature_value);
+	}
 
 	jz4740_timer_enable_watchdog();
 
