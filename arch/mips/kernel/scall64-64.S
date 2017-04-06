@@ -84,7 +84,7 @@ syscall_trace_entry:
 	SAVE_STATIC
 	move	s0, v0
 	move	a0, sp
-	daddiu	a1, v0, __NR_64_Linux
+	move	a1, v0
 	jal	syscall_trace_enter
 
 	bltz	v0, 1f			# seccomp failed? Skip syscall

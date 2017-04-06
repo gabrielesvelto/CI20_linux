@@ -574,6 +574,10 @@ asmlinkage __visible void __init start_kernel(void)
 		local_irq_disable();
 	idr_init_cache();
 	rcu_init();
+
+	/* trace_printk() and trace points may be used after this */
+	trace_init();
+
 	context_tracking_init();
 	radix_tree_init();
 	/* init some links before init_ISA_irqs() */
@@ -664,6 +668,7 @@ asmlinkage __visible void __init start_kernel(void)
 
 	check_bugs();
 
+	acpi_subsystem_init();
 	sfi_init_late();
 
 	if (efi_enabled(EFI_RUNTIME_SERVICES)) {

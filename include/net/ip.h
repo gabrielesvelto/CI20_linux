@@ -160,6 +160,7 @@ static inline __u8 get_rtconn_flags(struct ipcm_cookie* ipc, struct sock* sk)
 }
 
 /* datagram.c */
+int __ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
 int ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
 
 void ip4_datagram_release_cb(struct sock *sk);
@@ -182,7 +183,7 @@ static inline __u8 ip_reply_arg_flowi_flags(const struct ip_reply_arg *arg)
 	return (arg->flags & IP_REPLY_ARG_NOSRCCHECK) ? FLOWI_FLAG_ANYSRC : 0;
 }
 
-void ip_send_unicast_reply(struct net *net, struct sk_buff *skb,
+void ip_send_unicast_reply(struct sock *sk, struct sk_buff *skb,
 			   const struct ip_options *sopt,
 			   __be32 daddr, __be32 saddr,
 			   const struct ip_reply_arg *arg,
@@ -232,6 +233,8 @@ static inline int inet_is_local_reserved_port(struct net *net, int port)
 	return 0;
 }
 #endif
+
+__be32 inet_current_timestamp(void);
 
 /* From inetpeer.c */
 extern int inet_peer_threshold;
@@ -453,22 +456,6 @@ static __inline__ void inet_reset_saddr(struct sock *sk)
 }
 
 #endif
-
-static inline int sk_mc_loop(struct sock *sk)
-{
-	if (!sk)
-		return 1;
-	switch (sk->sk_family) {
-	case AF_INET:
-		return inet_sk(sk)->mc_loop;
-#if IS_ENABLED(CONFIG_IPV6)
-	case AF_INET6:
-		return inet6_sk(sk)->mc_loop;
-#endif
-	}
-	WARN_ON(1);
-	return 1;
-}
 
 bool ip_call_ra_chain(struct sk_buff *skb);
 

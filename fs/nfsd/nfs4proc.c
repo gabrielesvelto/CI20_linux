@@ -878,6 +878,7 @@ nfsd4_secinfo(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 				    &exp, &dentry);
 	if (err)
 		return err;
+	fh_unlock(&cstate->current_fh);
 	if (dentry->d_inode == NULL) {
 		exp_put(exp);
 		err = nfserr_noent;
@@ -1028,6 +1029,8 @@ nfsd4_seek(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		dprintk("NFSD: nfsd4_seek: couldn't process stateid!\n");
 		return status;
 	}
+	if (!file)
+		return nfserr_bad_stateid;
 
 	switch (seek->seek_whence) {
 	case NFS4_CONTENT_DATA:

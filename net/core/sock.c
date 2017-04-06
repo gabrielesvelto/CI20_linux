@@ -422,8 +422,6 @@ static void sock_warn_obsolete_bsdism(const char *name)
 	}
 }
 
-#define SK_FLAGS_TIMESTAMP ((1UL << SOCK_TIMESTAMP) | (1UL << SOCK_TIMESTAMPING_RX_SOFTWARE))
-
 static void sock_disable_timestamp(struct sock *sk, unsigned long flags)
 {
 	if (sk->sk_flags & flags) {
@@ -651,6 +649,25 @@ static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
 		sock_reset_flag(sk, bit);
 }
 
+bool sk_mc_loop(struct sock *sk)
+{
+	if (dev_recursion_level())
+		return false;
+	if (!sk)
+		return true;
+	switch (sk->sk_family) {
+	case AF_INET:
+		return inet_sk(sk)->mc_loop;
+#if IS_ENABLED(CONFIG_IPV6)
+	case AF_INET6:
+		return inet6_sk(sk)->mc_loop;
+#endif
+	}
+	WARN_ON(1);
+	return true;
+}
+EXPORT_SYMBOL(sk_mc_loop);
+
 /*
  *	This is meant for all protocols to use and covers goings on
  *	at the socket level. Everything here is generic.
@@ -716,7 +733,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 		val = min_t(u32, val, sysctl_wmem_max);
 set_sndbuf:
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
-		sk->sk_sndbuf = max_t(u32, val * 2, SOCK_MIN_SNDBUF);
+		sk->sk_sndbuf = max_t(int, val * 2, SOCK_MIN_SNDBUF);
 		/* Wake up sending tasks if we upped the value. */
 		sk->sk_write_space(sk);
 		break;
@@ -752,7 +769,7 @@ set_rcvbuf:
 		 * returning the value we actually used in getsockopt
 		 * is the most desirable behavior.
 		 */
-		sk->sk_rcvbuf = max_t(u32, val * 2, SOCK_MIN_RCVBUF);
+		sk->sk_rcvbuf = max_t(int, val * 2, SOCK_MIN_RCVBUF);
 		break;
 
 	case SO_RCVBUFFORCE:
@@ -842,7 +859,8 @@ set_rcvbuf:
 		}
 		if (val & SOF_TIMESTAMPING_OPT_ID &&
 		    !(sk->sk_tsflags & SOF_TIMESTAMPING_OPT_ID)) {
-			if (sk->sk_protocol == IPPROTO_TCP) {
+			if (sk->sk_protocol == IPPROTO_TCP &&
+			    sk->sk_type == SOCK_STREAM) {
 				if (sk->sk_state != TCP_ESTABLISHED) {
 					ret = -EINVAL;
 					break;
@@ -1835,7 +1853,7 @@ bool skb_page_frag_refill(unsigned int sz, struct page_frag *pfrag, gfp_t gfp)
 
 	pfrag->offset = 0;
 	if (SKB_FRAG_PAGE_ORDER) {
-		pfrag->page = alloc_pages(gfp | __GFP_COMP |
+		pfrag->page = alloc_pages((gfp & ~__GFP_WAIT) | __GFP_COMP |
 					  __GFP_NOWARN | __GFP_NORETRY,
 					  SKB_FRAG_PAGE_ORDER);
 		if (likely(pfrag->page)) {
@@ -2274,8 +2292,11 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 		sk->sk_type	=	sock->type;
 		sk->sk_wq	=	sock->wq;
 		sock->sk	=	sk;
-	} else
+		sk->sk_uid	=	SOCK_INODE(sock)->i_uid;
+	} else {
 		sk->sk_wq	=	NULL;
+		sk->sk_uid	=	make_kuid(sock_net(sk)->user_ns, 0);
+	}
 
 	spin_lock_init(&sk->sk_dst_lock);
 	rwlock_init(&sk->sk_callback_lock);

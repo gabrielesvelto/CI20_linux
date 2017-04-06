@@ -388,6 +388,7 @@ int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	int peeked, off = 0;
 	int err;
 	int is_udplite = IS_UDPLITE(sk);
+	bool checksum_valid = false;
 	int is_udp4;
 	bool slow;
 
@@ -419,11 +420,12 @@ try_again:
 	 */
 
 	if (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {
-		if (udp_lib_checksum_complete(skb))
+		checksum_valid = !udp_lib_checksum_complete(skb);
+		if (!checksum_valid)
 			goto csum_copy_err;
 	}
 
-	if (skb_csum_unnecessary(skb))
+	if (checksum_valid || skb_csum_unnecessary(skb))
 		err = skb_copy_datagram_iovec(skb, sizeof(struct udphdr),
 					      msg->msg_iov, copied);
 	else {
@@ -719,7 +721,9 @@ static bool __udp_v6_is_mcast_sock(struct net *net, struct sock *sk,
 	    (inet->inet_dport && inet->inet_dport != rmt_port) ||
 	    (!ipv6_addr_any(&sk->sk_v6_daddr) &&
 		    !ipv6_addr_equal(&sk->sk_v6_daddr, rmt_addr)) ||
-	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != dif))
+	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != dif) ||
+	    (!ipv6_addr_any(&sk->sk_v6_rcv_saddr) &&
+		    !ipv6_addr_equal(&sk->sk_v6_rcv_saddr, loc_addr)))
 		return false;
 	if (!inet6_mc_check(sk, loc_addr, rmt_addr))
 		return false;
@@ -896,11 +900,9 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		ret = udpv6_queue_rcv_skb(sk, skb);
 		sock_put(sk);
 
-		/* a return value > 0 means to resubmit the input, but
-		 * it wants the return to be -protocol, or 0
-		 */
+		/* a return value > 0 means to resubmit the input */
 		if (ret > 0)
-			return -ret;
+			return ret;
 
 		return 0;
 	}
@@ -1212,7 +1214,7 @@ do_udp_sendmsg:
 		fl6.flowi6_oif = np->sticky_pktinfo.ipi6_ifindex;
 
 	fl6.flowi6_mark = sk->sk_mark;
-	fl6.flowi6_uid = sock_i_uid(sk);
+	fl6.flowi6_uid = sk->sk_uid;
 
 	if (msg->msg_controllen) {
 		opt = &opt_space;

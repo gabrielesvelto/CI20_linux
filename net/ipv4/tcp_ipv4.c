@@ -683,7 +683,9 @@ static void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb)
 		arg.bound_dev_if = sk->sk_bound_dev_if;
 
 	arg.tos = ip_hdr(skb)->tos;
-	ip_send_unicast_reply(net, skb, &TCP_SKB_CB(skb)->header.h4.opt,
+	arg.uid = sock_net_uid(net, sk && sk_fullsock(sk) ? sk : NULL);
+	ip_send_unicast_reply(*this_cpu_ptr(net->ipv4.tcp_sk),
+			      skb, &TCP_SKB_CB(skb)->header.h4.opt,
 			      ip_hdr(skb)->saddr, ip_hdr(skb)->daddr,
 			      &arg, arg.iov[0].iov_len);
 
@@ -703,7 +705,8 @@ release_sk1:
    outside socket context is ugly, certainly. What can I do?
  */
 
-static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
+static void tcp_v4_send_ack(const struct sock *sk, struct sk_buff *skb,
+			    u32 seq, u32 ack,
 			    u32 win, u32 tsval, u32 tsecr, int oif,
 			    struct tcp_md5sig_key *key,
 			    int reply_flags, u8 tos)
@@ -718,7 +721,7 @@ static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
 			];
 	} rep;
 	struct ip_reply_arg arg;
-	struct net *net = dev_net(skb_dst(skb)->dev);
+	struct net *net = sock_net(sk);
 
 	memset(&rep.th, 0, sizeof(struct tcphdr));
 	memset(&arg, 0, sizeof(arg));
@@ -767,7 +770,9 @@ static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
 	if (oif)
 		arg.bound_dev_if = oif;
 	arg.tos = tos;
-	ip_send_unicast_reply(net, skb, &TCP_SKB_CB(skb)->header.h4.opt,
+	arg.uid = sock_net_uid(net, sk_fullsock(sk) ? sk : NULL);
+	ip_send_unicast_reply(*this_cpu_ptr(net->ipv4.tcp_sk),
+			      skb, &TCP_SKB_CB(skb)->header.h4.opt,
 			      ip_hdr(skb)->saddr, ip_hdr(skb)->daddr,
 			      &arg, arg.iov[0].iov_len);
 
@@ -779,7 +784,7 @@ static void tcp_v4_timewait_ack(struct sock *sk, struct sk_buff *skb)
 	struct inet_timewait_sock *tw = inet_twsk(sk);
 	struct tcp_timewait_sock *tcptw = tcp_twsk(sk);
 
-	tcp_v4_send_ack(skb, tcptw->tw_snd_nxt, tcptw->tw_rcv_nxt,
+	tcp_v4_send_ack(sk, skb, tcptw->tw_snd_nxt, tcptw->tw_rcv_nxt,
 			tcptw->tw_rcv_wnd >> tw->tw_rcv_wscale,
 			tcp_time_stamp + tcptw->tw_ts_offset,
 			tcptw->tw_ts_recent,
@@ -798,7 +803,7 @@ static void tcp_v4_reqsk_send_ack(struct sock *sk, struct sk_buff *skb,
 	/* sk->sk_state == TCP_LISTEN -> for regular TCP_SYN_RECV
 	 * sk->sk_state == TCP_SYN_RECV -> for Fast Open.
 	 */
-	tcp_v4_send_ack(skb, (sk->sk_state == TCP_LISTEN) ?
+	tcp_v4_send_ack(sk, skb, (sk->sk_state == TCP_LISTEN) ?
 			tcp_rsk(req)->snt_isn + 1 : tcp_sk(sk)->snd_nxt,
 			tcp_rsk(req)->rcv_nxt, req->rcv_wnd,
 			tcp_time_stamp,
@@ -957,7 +962,8 @@ int tcp_md5_do_add(struct sock *sk, const union tcp_md5_addr *addr,
 	}
 
 	md5sig = rcu_dereference_protected(tp->md5sig_info,
-					   sock_owned_by_user(sk));
+					   sock_owned_by_user(sk) ||
+					   lockdep_is_held(&sk->sk_lock.slock));
 	if (!md5sig) {
 		md5sig = kmalloc(sizeof(*md5sig), gfp);
 		if (!md5sig)
@@ -1512,7 +1518,7 @@ void tcp_v4_early_demux(struct sk_buff *skb)
 		skb->sk = sk;
 		skb->destructor = sock_edemux;
 		if (sk->sk_state != TCP_TIME_WAIT) {
-			struct dst_entry *dst = sk->sk_rx_dst;
+			struct dst_entry *dst = READ_ONCE(sk->sk_rx_dst);
 
 			if (dst)
 				dst = dst_check(dst, 0);
@@ -1550,7 +1556,7 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 	if (likely(sk->sk_rx_dst))
 		skb_dst_drop(skb);
 	else
-		skb_dst_force(skb);
+		skb_dst_force_safe(skb);
 
 	__skb_queue_tail(&tp->ucopy.prequeue, skb);
 	tp->ucopy.memory += skb->truesize;
@@ -1755,8 +1761,7 @@ void inet_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
 
-	if (dst) {
-		dst_hold(dst);
+	if (dst && dst_hold_safe(dst)) {
 		sk->sk_rx_dst = dst;
 		inet_sk(sk)->rx_dst_ifindex = skb->skb_iif;
 	}
@@ -2427,14 +2432,39 @@ struct proto tcp_prot = {
 };
 EXPORT_SYMBOL(tcp_prot);
 
-static int __net_init tcp_sk_init(struct net *net)
-{
-	net->ipv4.sysctl_tcp_ecn = 2;
-	return 0;
-}
-
 static void __net_exit tcp_sk_exit(struct net *net)
 {
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		inet_ctl_sock_destroy(*per_cpu_ptr(net->ipv4.tcp_sk, cpu));
+	free_percpu(net->ipv4.tcp_sk);
+}
+
+static int __net_init tcp_sk_init(struct net *net)
+{
+	int res, cpu;
+
+	net->ipv4.tcp_sk = alloc_percpu(struct sock *);
+	if (!net->ipv4.tcp_sk)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		struct sock *sk;
+
+		res = inet_ctl_sock_create(&sk, PF_INET, SOCK_RAW,
+					   IPPROTO_TCP, net);
+		if (res)
+			goto fail;
+		*per_cpu_ptr(net->ipv4.tcp_sk, cpu) = sk;
+	}
+	net->ipv4.sysctl_tcp_ecn = 2;
+	return 0;
+
+fail:
+	tcp_sk_exit(net);
+
+	return res;
 }
 
 static void __net_exit tcp_sk_exit_batch(struct list_head *net_exit_list)

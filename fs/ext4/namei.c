@@ -2051,7 +2051,7 @@ static int ext4_add_entry(handle_t *handle, struct dentry *dentry,
 			  struct inode *inode)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
-	struct buffer_head *bh;
+	struct buffer_head *bh = NULL;
 	struct ext4_dir_entry_2 *de;
 	struct ext4_dir_entry_tail *t;
 	struct super_block *sb;
@@ -2081,14 +2081,14 @@ static int ext4_add_entry(handle_t *handle, struct dentry *dentry,
 			goto out;
 		if (retval == 1) {
 			retval = 0;
-			return retval;
+			goto out;
 		}
 	}
 
 	if (is_dx(dir)) {
 		retval = ext4_dx_add_entry(handle, &fname, dentry, inode);
 		if (!retval || (retval != ERR_BAD_DX_DIR))
-			return retval;
+			goto out;
 		ext4_clear_inode_flag(dir, EXT4_INODE_INDEX);
 		dx_fallback++;
 		ext4_mark_inode_dirty(handle, dir);
@@ -2798,7 +2798,7 @@ int ext4_orphan_add(handle_t *handle, struct inode *inode)
 			 * list entries can cause panics at unmount time.
 			 */
 			mutex_lock(&sbi->s_orphan_lock);
-			list_del(&EXT4_I(inode)->i_orphan);
+			list_del_init(&EXT4_I(inode)->i_orphan);
 			mutex_unlock(&sbi->s_orphan_lock);
 		}
 	}
@@ -3516,12 +3516,18 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 2);
 	if (!(flags & RENAME_WHITEOUT)) {
 		handle = ext4_journal_start(old.dir, EXT4_HT_DIR, credits);
-		if (IS_ERR(handle))
-			return PTR_ERR(handle);
+		if (IS_ERR(handle)) {
+			retval = PTR_ERR(handle);
+			handle = NULL;
+			goto end_rename;
+		}
 	} else {
 		whiteout = ext4_whiteout_for_rename(&old, credits, &handle);
-		if (IS_ERR(whiteout))
-			return PTR_ERR(whiteout);
+		if (IS_ERR(whiteout)) {
+			retval = PTR_ERR(whiteout);
+			whiteout = NULL;
+			goto end_rename;
+		}
 	}
 
 	if (IS_DIRSYNC(old.dir) || IS_DIRSYNC(new.dir))
@@ -3695,8 +3701,11 @@ static int ext4_cross_rename(struct inode *old_dir, struct dentry *old_dentry,
 	handle = ext4_journal_start(old.dir, EXT4_HT_DIR,
 		(2 * EXT4_DATA_TRANS_BLOCKS(old.dir->i_sb) +
 		 2 * EXT4_INDEX_EXTRA_TRANS_BLOCKS + 2));
-	if (IS_ERR(handle))
-		return PTR_ERR(handle);
+	if (IS_ERR(handle)) {
+		retval = PTR_ERR(handle);
+		handle = NULL;
+		goto end_rename;
+	}
 
 	if (IS_DIRSYNC(old.dir) || IS_DIRSYNC(new.dir))
 		ext4_handle_sync(handle);

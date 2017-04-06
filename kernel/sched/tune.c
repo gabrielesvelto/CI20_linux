@@ -15,7 +15,7 @@
 static bool schedtune_initialized = false;
 #endif
 
-unsigned int sysctl_sched_cfs_boost __read_mostly;
+int sysctl_sched_cfs_boost __read_mostly;
 
 extern struct target_nrg schedtune_target_nrg;
 
@@ -368,13 +368,6 @@ void schedtune_enqueue_task(struct task_struct *p, int cpu)
 	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
-static int schedtune_allow_attach(struct cgroup_subsys_state *css,
-		struct cgroup_taskset *tset)
-{
-	/* We always allows tasks to be moved between existing CGroups */
-	return 0;
-}
-
 static int schedtune_can_attach(struct cgroup_subsys_state *css,
 			  struct cgroup_taskset *tset)
 {
@@ -720,7 +713,6 @@ schedtune_css_free(struct cgroup_subsys_state *css)
 struct cgroup_subsys schedtune_cgrp_subsys = {
 	.css_alloc	= schedtune_css_alloc,
 	.css_free	= schedtune_css_free,
-	.allow_attach   = schedtune_allow_attach,
 	.can_attach     = schedtune_can_attach,
 	.cancel_attach  = schedtune_cancel_attach,
 	.legacy_cftypes	= files,
@@ -737,6 +729,7 @@ schedtune_init_cgroups(void)
 	for_each_possible_cpu(cpu) {
 		bg = &per_cpu(cpu_boost_groups, cpu);
 		memset(bg, 0, sizeof(struct boost_groups));
+		raw_spin_lock_init(&bg->lock);
 	}
 
 	pr_info("schedtune: configured to support %d boost groups\n",

@@ -337,8 +337,10 @@ static int ext4_update_inline_data(handle_t *handle, struct inode *inode,
 
 	len -= EXT4_MIN_INLINE_DATA_SIZE;
 	value = kzalloc(len, GFP_NOFS);
-	if (!value)
+	if (!value) {
+		error = -ENOMEM;
 		goto out;
+	}
 
 	error = ext4_xattr_ibody_get(inode, i.name_index, i.name,
 				     value, len);
@@ -502,8 +504,16 @@ int ext4_readpage_inline(struct inode *inode, struct page *page)
 		return -EAGAIN;
 	}
 
-	trace_android_fs_dataread_start(inode, page_offset(page), PAGE_SIZE,
-					current->pid, current->comm);
+	if (trace_android_fs_dataread_start_enabled()) {
+		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
+
+		path = android_fstrace_get_pathname(pathbuf,
+						    MAX_TRACE_PATHBUF_LEN,
+						    inode);
+		trace_android_fs_dataread_start(inode, page_offset(page),
+						PAGE_SIZE, current->pid,
+						path, current->comm);
+	}
 
 	/*
 	 * Current inline data can only exist in the 1st page,

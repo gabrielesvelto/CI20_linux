@@ -39,6 +39,7 @@
 #include <asm/setup.h>
 #include <asm/sizes.h>
 #include <asm/tlb.h>
+#include <asm/alternative.h>
 
 #include "mm.h"
 
@@ -67,7 +68,7 @@ early_param("initrd", early_initrd);
  * currently assumes that for memory starting above 4G, 32-bit devices will
  * use a DMA offset.
  */
-static phys_addr_t max_zone_dma_phys(void)
+static phys_addr_t __init max_zone_dma_phys(void)
 {
 	phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
 	return min(offset + (1ULL << 32), memblock_end_of_DRAM());
@@ -123,11 +124,11 @@ EXPORT_SYMBOL(pfn_valid);
 #endif
 
 #ifndef CONFIG_SPARSEMEM
-static void arm64_memory_present(void)
+static void __init arm64_memory_present(void)
 {
 }
 #else
-static void arm64_memory_present(void)
+static void __init arm64_memory_present(void)
 {
 	struct memblock_region *reg;
 
@@ -239,7 +240,7 @@ static void __init free_unused_memmap(void)
 		 * memmap entries are valid from the bank end aligned to
 		 * MAX_ORDER_NR_PAGES.
 		 */
-		prev_end = ALIGN(start + __phys_to_pfn(reg->size),
+		prev_end = ALIGN(__phys_to_pfn(reg->base + reg->size),
 				 MAX_ORDER_NR_PAGES);
 	}
 
@@ -287,8 +288,8 @@ void __init mem_init(void)
 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
 		  MLG(VMALLOC_START, VMALLOC_END),
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-		  MLG((unsigned long)vmemmap,
-		      (unsigned long)vmemmap + VMEMMAP_SIZE),
+		  MLG(VMEMMAP_START,
+		      VMEMMAP_START + VMEMMAP_SIZE),
 		  MLM((unsigned long)virt_to_page(PAGE_OFFSET),
 		      (unsigned long)virt_to_page(high_memory)),
 #endif
@@ -328,6 +329,7 @@ void free_initmem(void)
 {
 	fixup_init();
 	free_initmem_default(0);
+	free_alternatives_memory();
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -336,14 +338,8 @@ static int keep_initrd;
 
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (!keep_initrd) {
-		if (start == initrd_start)
-			start = round_down(start, PAGE_SIZE);
-		if (end == initrd_end)
-			end = round_up(end, PAGE_SIZE);
-
+	if (!keep_initrd)
 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-	}
 }
 
 static int __init keepinitrd_setup(char *__unused)

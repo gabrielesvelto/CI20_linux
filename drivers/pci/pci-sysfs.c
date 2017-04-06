@@ -515,7 +515,8 @@ static ssize_t driver_override_store(struct device *dev,
 	struct pci_dev *pdev = to_pci_dev(dev);
 	char *driver_override, *old = pdev->driver_override, *cp;
 
-	if (count > PATH_MAX)
+	/* We need to keep extra room for a newline */
+	if (count >= (PAGE_SIZE - 1))
 		return -EINVAL;
 
 	driver_override = kstrndup(buf, count, GFP_KERNEL);
@@ -543,7 +544,7 @@ static ssize_t driver_override_show(struct device *dev,
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 
-	return sprintf(buf, "%s\n", pdev->driver_override);
+	return snprintf(buf, PAGE_SIZE, "%s\n", pdev->driver_override);
 }
 static DEVICE_ATTR_RW(driver_override);
 
@@ -1362,10 +1363,10 @@ int __must_check pci_create_sysfs_dev_files(struct pci_dev *pdev)
 	if (!sysfs_initialized)
 		return -EACCES;
 
-	if (pdev->cfg_size < PCI_CFG_SPACE_EXP_SIZE)
-		retval = sysfs_create_bin_file(&pdev->dev.kobj, &pci_config_attr);
-	else
+	if (pdev->cfg_size > PCI_CFG_SPACE_SIZE)
 		retval = sysfs_create_bin_file(&pdev->dev.kobj, &pcie_config_attr);
+	else
+		retval = sysfs_create_bin_file(&pdev->dev.kobj, &pci_config_attr);
 	if (retval)
 		goto err;
 
@@ -1417,10 +1418,10 @@ err_rom_file:
 err_resource_files:
 	pci_remove_resource_files(pdev);
 err_config_file:
-	if (pdev->cfg_size < PCI_CFG_SPACE_EXP_SIZE)
-		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
-	else
+	if (pdev->cfg_size > PCI_CFG_SPACE_SIZE)
 		sysfs_remove_bin_file(&pdev->dev.kobj, &pcie_config_attr);
+	else
+		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
 err:
 	return retval;
 }
@@ -1454,10 +1455,10 @@ void pci_remove_sysfs_dev_files(struct pci_dev *pdev)
 
 	pci_remove_capabilities_sysfs(pdev);
 
-	if (pdev->cfg_size < PCI_CFG_SPACE_EXP_SIZE)
-		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
-	else
+	if (pdev->cfg_size > PCI_CFG_SPACE_SIZE)
 		sysfs_remove_bin_file(&pdev->dev.kobj, &pcie_config_attr);
+	else
+		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
 
 	pci_remove_resource_files(pdev);
 

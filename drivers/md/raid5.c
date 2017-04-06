@@ -1936,7 +1936,8 @@ static int resize_stripes(struct r5conf *conf, int newsize)
 
 	conf->slab_cache = sc;
 	conf->active_name = 1-conf->active_name;
-	conf->pool_size = newsize;
+	if (!err)
+		conf->pool_size = newsize;
 	return err;
 }
 
@@ -3059,6 +3060,8 @@ static void handle_stripe_clean_event(struct r5conf *conf,
 		}
 	if (!discard_pending &&
 	    test_bit(R5_Discard, &sh->dev[sh->pd_idx].flags)) {
+		int hash = sh->hash_lock_index;
+
 		clear_bit(R5_Discard, &sh->dev[sh->pd_idx].flags);
 		clear_bit(R5_UPTODATE, &sh->dev[sh->pd_idx].flags);
 		if (sh->qd_idx >= 0) {
@@ -3072,9 +3075,9 @@ static void handle_stripe_clean_event(struct r5conf *conf,
 		 * no updated data, so remove it from hash list and the stripe
 		 * will be reinitialized
 		 */
-		spin_lock_irq(&conf->device_lock);
+		spin_lock_irq(conf->hash_locks + hash);
 		remove_hash(sh);
-		spin_unlock_irq(&conf->device_lock);
+		spin_unlock_irq(conf->hash_locks + hash);
 		if (test_bit(STRIPE_SYNC_REQUESTED, &sh->state))
 			set_bit(STRIPE_HANDLE, &sh->state);
 
@@ -3102,7 +3105,8 @@ static void handle_stripe_dirtying(struct r5conf *conf,
 	 * generate correct data from the parity.
 	 */
 	if (conf->max_degraded == 2 ||
-	    (recovery_cp < MaxSector && sh->sector >= recovery_cp)) {
+	    (recovery_cp < MaxSector && sh->sector >= recovery_cp &&
+	     s->failed == 0)) {
 		/* Calculate the real rcw later - for now make it
 		 * look like rcw is cheaper
 		 */
@@ -3195,6 +3199,11 @@ static void handle_stripe_dirtying(struct r5conf *conf,
 					  (unsigned long long)sh->sector,
 					  rcw, qread, test_bit(STRIPE_DELAYED, &sh->state));
 	}
+
+	if (rcw > disks && rmw > disks &&
+	    !test_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
+		set_bit(STRIPE_DELAYED, &sh->state);
+
 	/* now if nothing is locked, and if we have enough data,
 	 * we can start a write request
 	 */
@@ -6194,6 +6203,15 @@ static int run(struct mddev *mddev)
 			stripe = (stripe | (stripe-1)) + 1;
 		mddev->queue->limits.discard_alignment = stripe;
 		mddev->queue->limits.discard_granularity = stripe;
+
+		/*
+		 * We use 16-bit counter of active stripes in bi_phys_segments
+		 * (minus one for over-loaded initialization)
+		 */
+		blk_queue_max_hw_sectors(mddev->queue, 0xfffe * STRIPE_SECTORS);
+		blk_queue_max_discard_sectors(mddev->queue,
+					      0xfffe * STRIPE_SECTORS);
+
 		/*
 		 * unaligned part of discard request will be ignored, so can't
 		 * guarantee discard_zeroes_data
@@ -6236,8 +6254,8 @@ static int run(struct mddev *mddev)
 		}
 
 		if (discard_supported &&
-		   mddev->queue->limits.max_discard_sectors >= stripe &&
-		   mddev->queue->limits.discard_granularity >= stripe)
+		    mddev->queue->limits.max_discard_sectors >= (stripe >> 9) &&
+		    mddev->queue->limits.discard_granularity >= stripe)
 			queue_flag_set_unlocked(QUEUE_FLAG_DISCARD,
 						mddev->queue);
 		else

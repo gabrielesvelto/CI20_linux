@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 
+#define CREATE_TRACE_POINTS
 #include <trace/events/mmc.h>
 
 #include <linux/mmc/card.h>
@@ -46,6 +47,11 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 #include "sdio_ops.h"
+
+EXPORT_TRACEPOINT_SYMBOL_GPL(mmc_blk_erase_start);
+EXPORT_TRACEPOINT_SYMBOL_GPL(mmc_blk_erase_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(mmc_blk_rw_start);
+EXPORT_TRACEPOINT_SYMBOL_GPL(mmc_blk_rw_end);
 
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
@@ -160,6 +166,7 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 			pr_debug("%s:     %d bytes transferred: %d\n",
 				mmc_hostname(host),
 				mrq->data->bytes_xfered, mrq->data->error);
+#ifdef CONFIG_BLOCK
 			if (mrq->lat_hist_enabled) {
 				ktime_t completion;
 				u_int64_t delta_us;
@@ -171,6 +178,7 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 					(mrq->data->flags & MMC_DATA_READ),
 					delta_us);
 			}
+#endif
 			trace_mmc_blk_rw_end(cmd->opcode, cmd->arg, mrq->data);
 		}
 
@@ -328,8 +336,10 @@ EXPORT_SYMBOL(mmc_start_bkops);
  */
 static void mmc_wait_data_done(struct mmc_request *mrq)
 {
-	mrq->host->context_info.is_done_rcv = true;
-	wake_up_interruptible(&mrq->host->context_info.wait);
+	struct mmc_context_info *context_info = &mrq->host->context_info;
+
+	context_info->is_done_rcv = true;
+	wake_up_interruptible(&context_info->wait);
 }
 
 static void mmc_wait_done(struct mmc_request *mrq)
@@ -557,11 +567,13 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	}
 
 	if (!err && areq) {
+#ifdef CONFIG_BLOCK
 		if (host->latency_hist_enabled) {
 			areq->mrq->io_start = ktime_get();
 			areq->mrq->lat_hist_enabled = 1;
 		} else
 			areq->mrq->lat_hist_enabled = 0;
+#endif
 		trace_mmc_blk_rw_start(areq->mrq->cmd->opcode,
 				       areq->mrq->cmd->arg,
 				       areq->mrq->data);
@@ -832,11 +844,11 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 	/*
 	 * Some cards require longer data read timeout than indicated in CSD.
 	 * Address this by setting the read timeout to a "reasonably high"
-	 * value. For the cards tested, 300ms has proven enough. If necessary,
+	 * value. For the cards tested, 600ms has proven enough. If necessary,
 	 * this value can be increased if other problematic cards require this.
 	 */
 	if (mmc_card_long_read_time(card) && data->flags & MMC_DATA_READ) {
-		data->timeout_ns = 300000000;
+		data->timeout_ns = 600000000;
 		data->timeout_clks = 0;
 	}
 
@@ -1088,6 +1100,30 @@ void mmc_set_ungated(struct mmc_host *host)
 {
 }
 #endif
+
+int mmc_execute_tuning(struct mmc_card *card)
+{
+	struct mmc_host *host = card->host;
+	u32 opcode;
+	int err;
+
+	if (!host->ops->execute_tuning)
+		return 0;
+
+	if (mmc_card_mmc(card))
+		opcode = MMC_SEND_TUNING_BLOCK_HS200;
+	else
+		opcode = MMC_SEND_TUNING_BLOCK;
+
+	mmc_host_clk_hold(host);
+	err = host->ops->execute_tuning(host, opcode);
+	mmc_host_clk_release(host);
+
+	if (err)
+		pr_err("%s: tuning execution failed\n", mmc_hostname(host));
+
+	return err;
+}
 
 /*
  * Change the bus mode (open drain/push-pull) of a host.
@@ -2645,6 +2681,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
+	case PM_RESTORE_PREPARE:
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
@@ -2756,6 +2793,7 @@ static void __exit mmc_exit(void)
 	destroy_workqueue(workqueue);
 }
 
+#ifdef CONFIG_BLOCK
 static ssize_t
 latency_hist_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -2803,6 +2841,7 @@ mmc_latency_hist_sysfs_exit(struct mmc_host *host)
 {
 	device_remove_file(&host->class_dev, &dev_attr_latency_hist);
 }
+#endif
 
 subsys_initcall(mmc_init);
 module_exit(mmc_exit);

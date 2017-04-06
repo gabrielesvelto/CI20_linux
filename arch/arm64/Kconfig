@@ -21,7 +21,7 @@ config ARM64
 	select DCACHE_WORD_ACCESS
 	select GENERIC_ALLOCATOR
 	select GENERIC_CLOCKEVENTS
-	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+	select GENERIC_CLOCKEVENTS_BROADCAST
 	select GENERIC_CPU_AUTOPROBE
 	select GENERIC_EARLY_IOREMAP
 	select GENERIC_IOMAP
@@ -126,6 +126,10 @@ config ILLEGAL_POINTER_VALUE
 config STACKTRACE_SUPPORT
 	def_bool y
 
+config ILLEGAL_POINTER_VALUE
+	hex
+	default 0xdead000000000000
+
 config LOCKDEP_SUPPORT
 	def_bool y
 
@@ -159,6 +163,9 @@ config NEED_DMA_MAP_STATE
 config NEED_SG_DMA_LENGTH
 	def_bool y
 
+config SMP
+	def_bool y
+
 config SWIOTLB
 	def_bool y
 
@@ -170,6 +177,13 @@ config KERNEL_MODE_NEON
 
 config FIX_EARLYCON_MEM
 	def_bool y
+
+config PGTABLE_LEVELS
+	int
+	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
+	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
 
 source "init/Kconfig"
 
@@ -228,6 +242,135 @@ endmenu
 
 menu "Kernel Features"
 
+menu "ARM errata workarounds via the alternatives framework"
+
+config ARM64_ERRATUM_826319
+	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 826319 on Cortex-A53 parts up to r0p2 with an AMBA 4 ACE or
+	  AXI master interface and an L2 cache.
+
+	  If a Cortex-A53 uses an AMBA AXI4 ACE interface to other processors
+	  and is unable to accept a certain write via this interface, it will
+	  not progress on read data presented on the read data channel and the
+	  system can deadlock.
+
+	  The workaround promotes data cache clean instructions to
+	  data cache clean-and-invalidate.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_827319
+	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 827319 on Cortex-A53 parts up to r0p2 with an AMBA 5 CHI
+	  master interface and an L2 cache.
+
+	  Under certain conditions this erratum can cause a clean line eviction
+	  to occur at the same time as another transaction to the same address
+	  on the AMBA 5 CHI interface, which can cause data corruption if the
+	  interconnect reorders the two transactions.
+
+	  The workaround promotes data cache clean instructions to
+	  data cache clean-and-invalidate.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_824069
+	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 824069 on Cortex-A53 parts up to r0p2 when it is connected
+	  to a coherent interconnect.
+
+	  If a Cortex-A53 processor is executing a store or prefetch for
+	  write instruction at the same time as a processor in another
+	  cluster is executing a cache maintenance operation to the same
+	  address, then this erratum might cause a clean cache line to be
+	  incorrectly marked as dirty.
+
+	  The workaround promotes data cache clean instructions to
+	  data cache clean-and-invalidate.
+	  Please note that this option does not necessarily enable the
+	  workaround, as it depends on the alternative framework, which will
+	  only patch the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_819472
+	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 819472 on Cortex-A53 parts up to r0p1 with an L2 cache
+	  present when it is connected to a coherent interconnect.
+
+	  If the processor is executing a load and store exclusive sequence at
+	  the same time as a processor in another cluster is executing a cache
+	  maintenance operation to the same address, then this erratum might
+	  cause data corruption.
+
+	  The workaround promotes data cache clean instructions to
+	  data cache clean-and-invalidate.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_832075
+	bool "Cortex-A57: 832075: possible deadlock on mixing exclusive memory accesses with device loads"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 832075 on Cortex-A57 parts up to r1p2.
+
+	  Affected Cortex-A57 parts might deadlock when exclusive load/store
+	  instructions to Write-Back memory are mixed with Device loads.
+
+	  The workaround is to promote device loads to use Load-Acquire
+	  semantics.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_845719
+	bool "Cortex-A53: 845719: a load might read incorrect data"
+	depends on COMPAT
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 845719 on Cortex-A53 parts up to r0p4.
+
+	  When running a compat (AArch32) userspace on an affected Cortex-A53
+	  part, a load at EL0 from a virtual address that matches the bottom 32
+	  bits of the virtual address used by a recent load at (AArch64) EL1
+	  might return incorrect data.
+
+	  The workaround is to write the contextidr_el1 register on exception
+	  return to a 32-bit task.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
+endmenu
+
+
 choice
 	prompt "Page size"
 	default ARM64_4K_PAGES
@@ -278,34 +421,13 @@ config ARM64_VA_BITS
 	default 42 if ARM64_VA_BITS_42
 	default 48 if ARM64_VA_BITS_48
 
-config ARM64_PGTABLE_LEVELS
-	int
-	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
-	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
-	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
-	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
-
 config CPU_BIG_ENDIAN
        bool "Build big-endian kernel"
        help
          Say Y if you plan on running a kernel in big-endian mode.
 
-config SMP
-	bool "Symmetric Multi-Processing"
-	help
-	  This enables support for systems with more than one CPU.  If
-	  you say N here, the kernel will run on single and
-	  multiprocessor machines, but will use only one CPU of a
-	  multiprocessor machine. If you say Y here, the kernel will run
-	  on many, but not all, single processor machines. On a single
-	  processor machine, the kernel will run faster if you say N
-	  here.
-
-	  If you don't know what to do here, say N.
-
 config SCHED_MC
 	bool "Multi-core scheduler support"
-	depends on SMP
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
 	  making when dealing with multi-core CPU chips at a cost of slightly
@@ -313,7 +435,6 @@ config SCHED_MC
 
 config SCHED_SMT
 	bool "SMT scheduler support"
-	depends on SMP
 	help
 	  Improves the CPU scheduler's decision making when dealing with
 	  MultiThreading at a cost of slightly increased overhead in some
@@ -321,14 +442,11 @@ config SCHED_SMT
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-64)"
-	range 2 64
-	depends on SMP
 	# These have to remain sorted largest to smallest
 	default "64"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP
 	help
 	  Say Y here to experiment with turning CPUs off and on.  CPUs
 	  can be controlled through /sys/devices/system/cpu.
@@ -477,6 +595,53 @@ config SETEND_EMULATION
 
 endif
 
+config ARM64_SW_TTBR0_PAN
+	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
+	help
+	  Enabling this option prevents the kernel from accessing
+	  user-space memory directly by pointing TTBR0_EL1 to a reserved
+	  zeroed area and reserved ASID. The user access routines
+	  restore the valid TTBR0_EL1 temporarily.
+
+menu "ARMv8.1 architectural features"
+
+config ARM64_PAN
+	bool "Enable support for Privileged Access Never (PAN)"
+	default y
+	help
+	 Privileged Access Never (PAN; part of the ARMv8.1 Extensions)
+	 prevents the kernel or hypervisor from accessing user-space (EL0)
+	 memory directly.
+
+	 Choosing this option will cause any unprotected (not using
+	 copy_to_user et al) memory access to fail with a permission fault.
+
+	 The feature is detected at runtime, and will remain as a 'nop'
+	 instruction if the cpu does not implement the feature.
+
+endmenu
+
+config ARM64_UAO
+	bool "Enable support for User Access Override (UAO)"
+	default y
+	help
+	  User Access Override (UAO; part of the ARMv8.2 Extensions)
+	  causes the 'unprivileged' variant of the load/store instructions to
+	  be overriden to be privileged.
+
+	  This option changes get_user() and friends to use the 'unprivileged'
+	  variant of the load/store instructions. This ensures that user-space
+	  really did have access to the supplied memory. When addr_limit is
+	  set to kernel memory the UAO bit will be set, allowing privileged
+	  access to kernel memory.
+
+	  Choosing this option will cause copy_to_user() et al to use user-space
+	  memory permissions.
+
+	  The feature is detected at runtime, the kernel will use the
+	  regular load/store instructions if the cpu does not implement the
+	  feature.
+
 endmenu
 
 menu "Boot options"
@@ -605,6 +770,22 @@ menu "CPU Power Management"
 source "drivers/cpuidle/Kconfig"
 
 source "drivers/cpufreq/Kconfig"
+
+config ARM64_ERRATUM_843419
+	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+	depends on MODULES
+	default y
+	help
+	  This option builds kernel modules using the large memory model in
+	  order to avoid the use of the ADRP instruction, which can cause
+	  a subsequent memory access to use an incorrect address on Cortex-A53
+	  parts up to r0p4.
+
+	  Note that the kernel itself must be linked with a version of ld
+	  which fixes potentially affected ADRP instructions through the
+	  use of veneers.
+
+	  If unsure, say Y.
 
 endmenu
 

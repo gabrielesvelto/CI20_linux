@@ -5,6 +5,7 @@
  */
 
 #include <asm-generic/vmlinux.lds.h>
+#include <asm/kernel-pgtable.h>
 #include <asm/thread_info.h>
 #include <asm/memory.h>
 #include <asm/page.h>
@@ -130,6 +131,17 @@ SECTIONS
 	. = ALIGN(PAGE_SIZE);
 	__init_end = .;
 
+	. = ALIGN(4);
+	.altinstructions : {
+		__alt_instructions = .;
+		*(.altinstructions)
+		__alt_instructions_end = .;
+	}
+	.altinstr_replacement : {
+		*(.altinstr_replacement)
+	}
+
+	. = ALIGN(PAGE_SIZE);
 	_data = .;
 	_sdata = .;
 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
@@ -143,6 +155,11 @@ SECTIONS
 	. += IDMAP_DIR_SIZE;
 	swapper_pg_dir = .;
 	. += SWAPPER_DIR_SIZE;
+
+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
+	reserved_ttbr0 = .;
+	. += RESERVED_TTBR0_SIZE;
+#endif
 
 	_end = .;
 

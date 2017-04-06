@@ -93,10 +93,9 @@ static void inet6_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
 
-	if (dst) {
+	if (dst && dst_hold_safe(dst)) {
 		const struct rt6_info *rt = (const struct rt6_info *)dst;
 
-		dst_hold(dst);
 		sk->sk_rx_dst = dst;
 		inet_sk(sk)->rx_dst_ifindex = skb->skb_iif;
 		if (rt->rt6i_node)
@@ -253,7 +252,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	fl6.flowi6_mark = sk->sk_mark;
 	fl6.fl6_dport = usin->sin6_port;
 	fl6.fl6_sport = inet->inet_sport;
-	fl6.flowi6_uid = sock_i_uid(sk);
+	fl6.flowi6_uid = sk->sk_uid;
 
 	opt = rcu_dereference_protected(np->opt, sock_owned_by_user(sk));
 	final_p = fl6_update_dst(&fl6, opt, &final);
@@ -873,6 +872,7 @@ static void tcp_v6_send_response(struct sock *sk, struct sk_buff *skb, u32 seq,
 	fl6.flowi6_mark = IP6_REPLY_MARK(net, skb->mark);
 	fl6.fl6_dport = t1->dest;
 	fl6.fl6_sport = t1->source;
+	fl6.flowi6_uid = sock_net_uid(net, sk && sk_fullsock(sk) ? sk : NULL);
 	security_skb_classify_flow(skb, flowi6_to_flowi(&fl6));
 
 	/* Pass a socket to ip6_dst_lookup either it is for RST
@@ -981,7 +981,7 @@ static void tcp_v6_timewait_ack(struct sock *sk, struct sk_buff *skb)
 			tcptw->tw_rcv_wnd >> tw->tw_rcv_wscale,
 			tcp_time_stamp + tcptw->tw_ts_offset,
 			tcptw->tw_ts_recent, tw->tw_bound_dev_if, tcp_twsk_md5_key(tcptw),
-			tw->tw_tclass, (tw->tw_flowlabel << 12));
+			tw->tw_tclass, cpu_to_be32(tw->tw_flowlabel));
 
 	inet_twsk_put(tw);
 }
@@ -1394,6 +1394,37 @@ ipv6_pktoptions:
 	return 0;
 }
 
+static void tcp_v6_fill_cb(struct sk_buff *skb, const struct ipv6hdr *hdr,
+			   const struct tcphdr *th)
+{
+	/* This is tricky: we move IP6CB at its correct location into
+	 * TCP_SKB_CB(). It must be done after xfrm6_policy_check(), because
+	 * _decode_session6() uses IP6CB().
+	 * barrier() makes sure compiler won't play aliasing games.
+	 */
+	memmove(&TCP_SKB_CB(skb)->header.h6, IP6CB(skb),
+		sizeof(struct inet6_skb_parm));
+	barrier();
+
+	TCP_SKB_CB(skb)->seq = ntohl(th->seq);
+	TCP_SKB_CB(skb)->end_seq = (TCP_SKB_CB(skb)->seq + th->syn + th->fin +
+				    skb->len - th->doff*4);
+	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
+	TCP_SKB_CB(skb)->tcp_flags = tcp_flag_byte(th);
+	TCP_SKB_CB(skb)->tcp_tw_isn = 0;
+	TCP_SKB_CB(skb)->ip_dsfield = ipv6_get_dsfield(hdr);
+	TCP_SKB_CB(skb)->sacked = 0;
+}
+
+static void tcp_v6_restore_cb(struct sk_buff *skb)
+{
+	/* We need to move header back to the beginning if xfrm6_policy_check()
+	 * and tcp_v6_fill_cb() are going to be called again.
+	 */
+	memmove(IP6CB(skb), &TCP_SKB_CB(skb)->header.h6,
+		sizeof(struct inet6_skb_parm));
+}
+
 static int tcp_v6_rcv(struct sk_buff *skb)
 {
 	const struct tcphdr *th;
@@ -1425,24 +1456,9 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 
 	th = tcp_hdr(skb);
 	hdr = ipv6_hdr(skb);
-	/* This is tricky : We move IPCB at its correct location into TCP_SKB_CB()
-	 * barrier() makes sure compiler wont play fool^Waliasing games.
-	 */
-	memmove(&TCP_SKB_CB(skb)->header.h6, IP6CB(skb),
-		sizeof(struct inet6_skb_parm));
-	barrier();
-
-	TCP_SKB_CB(skb)->seq = ntohl(th->seq);
-	TCP_SKB_CB(skb)->end_seq = (TCP_SKB_CB(skb)->seq + th->syn + th->fin +
-				    skb->len - th->doff*4);
-	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
-	TCP_SKB_CB(skb)->tcp_flags = tcp_flag_byte(th);
-	TCP_SKB_CB(skb)->tcp_tw_isn = 0;
-	TCP_SKB_CB(skb)->ip_dsfield = ipv6_get_dsfield(hdr);
-	TCP_SKB_CB(skb)->sacked = 0;
 
 	sk = __inet6_lookup_skb(&tcp_hashinfo, skb, th->source, th->dest,
-				tcp_v6_iif(skb));
+				inet6_iif(skb));
 	if (!sk)
 		goto no_tcp_socket;
 
@@ -1457,6 +1473,8 @@ process:
 
 	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
+
+	tcp_v6_fill_cb(skb, hdr, th);
 
 #ifdef CONFIG_TCP_MD5SIG
 	if (tcp_v6_inbound_md5_hash(sk, skb))
@@ -1489,6 +1507,8 @@ no_tcp_socket:
 	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_it;
 
+	tcp_v6_fill_cb(skb, hdr, th);
+
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 csum_error:
 		TCP_INC_STATS_BH(net, TCP_MIB_CSUMERRORS);
@@ -1511,6 +1531,8 @@ do_time_wait:
 		inet_twsk_put(inet_twsk(sk));
 		goto discard_it;
 	}
+
+	tcp_v6_fill_cb(skb, hdr, th);
 
 	if (skb->len < (th->doff<<2)) {
 		inet_twsk_put(inet_twsk(sk));
@@ -1535,6 +1557,7 @@ do_time_wait:
 			inet_twsk_deschedule(tw, &tcp_death_row);
 			inet_twsk_put(tw);
 			sk = sk2;
+			tcp_v6_restore_cb(skb);
 			goto process;
 		}
 		/* Fall through to ACK */
@@ -1543,6 +1566,7 @@ do_time_wait:
 		tcp_v6_timewait_ack(sk, skb);
 		break;
 	case TCP_TW_RST:
+		tcp_v6_restore_cb(skb);
 		goto no_tcp_socket;
 	case TCP_TW_SUCCESS:
 		;
@@ -1577,7 +1601,7 @@ static void tcp_v6_early_demux(struct sk_buff *skb)
 		skb->sk = sk;
 		skb->destructor = sock_edemux;
 		if (sk->sk_state != TCP_TIME_WAIT) {
-			struct dst_entry *dst = sk->sk_rx_dst;
+			struct dst_entry *dst = READ_ONCE(sk->sk_rx_dst);
 
 			if (dst)
 				dst = dst_check(dst, inet6_sk(sk)->rx_dst_cookie);
@@ -1727,7 +1751,9 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 	destp = ntohs(inet->inet_dport);
 	srcp  = ntohs(inet->inet_sport);
 
-	if (icsk->icsk_pending == ICSK_TIME_RETRANS) {
+	if (icsk->icsk_pending == ICSK_TIME_RETRANS ||
+	    icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
+	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE) {
 		timer_active	= 1;
 		timer_expires	= icsk->icsk_timeout;
 	} else if (icsk->icsk_pending == ICSK_TIME_PROBE0) {

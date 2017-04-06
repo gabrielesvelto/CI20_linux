@@ -305,7 +305,7 @@ static struct sock *unix_find_socket_byinode(struct inode *i)
 		    &unix_socket_table[i->i_ino & (UNIX_HASH_SIZE - 1)]) {
 		struct dentry *dentry = unix_sk(s)->path.dentry;
 
-		if (dentry && dentry->d_inode == i) {
+		if (dentry && d_backing_inode(dentry) == i) {
 			sock_hold(s);
 			goto found;
 		}
@@ -898,7 +898,7 @@ static struct sock *unix_find_other(struct net *net,
 		err = kern_path(sunname->sun_path, LOOKUP_FOLLOW, &path);
 		if (err)
 			goto fail;
-		inode = path.dentry->d_inode;
+		inode = d_backing_inode(path.dentry);
 		err = inode_permission(inode, MAY_WRITE);
 		if (err)
 			goto put_fail;
@@ -940,32 +940,20 @@ fail:
 	return NULL;
 }
 
-static int unix_mknod(const char *sun_path, umode_t mode, struct path *res)
+static int unix_mknod(struct dentry *dentry, struct path *path, umode_t mode,
+		      struct path *res)
 {
-	struct dentry *dentry;
-	struct path path;
-	int err = 0;
-	/*
-	 * Get the parent directory, calculate the hash for last
-	 * component.
-	 */
-	dentry = kern_path_create(AT_FDCWD, sun_path, &path, 0);
-	err = PTR_ERR(dentry);
-	if (IS_ERR(dentry))
-		return err;
+	int err;
 
-	/*
-	 * All right, let's create it.
-	 */
-	err = security_path_mknod(&path, dentry, mode, 0);
+	err = security_path_mknod(path, dentry, mode, 0);
 	if (!err) {
-		err = vfs_mknod(path.dentry->d_inode, dentry, mode, 0);
+		err = vfs_mknod(d_inode(path->dentry), dentry, mode, 0);
 		if (!err) {
-			res->mnt = mntget(path.mnt);
+			res->mnt = mntget(path->mnt);
 			res->dentry = dget(dentry);
 		}
 	}
-	done_path_create(&path, dentry);
+
 	return err;
 }
 
@@ -976,10 +964,12 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct unix_sock *u = unix_sk(sk);
 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)uaddr;
 	char *sun_path = sunaddr->sun_path;
-	int err;
+	int err, name_err;
 	unsigned int hash;
 	struct unix_address *addr;
 	struct hlist_head *list;
+	struct path path;
+	struct dentry *dentry;
 
 	err = -EINVAL;
 	if (sunaddr->sun_family != AF_UNIX)
@@ -995,13 +985,33 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		goto out;
 	addr_len = err;
 
+	name_err = 0;
+	dentry = NULL;
+	if (sun_path[0]) {
+		/* Get the parent directory, calculate the hash for last
+		 * component.
+		 */
+		dentry = kern_path_create(AT_FDCWD, sun_path, &path, 0);
+
+		if (IS_ERR(dentry)) {
+			/* delay report until after 'already bound' check */
+			name_err = PTR_ERR(dentry);
+			dentry = NULL;
+		}
+	}
+
 	err = mutex_lock_interruptible(&u->readlock);
 	if (err)
-		goto out;
+		goto out_path;
 
 	err = -EINVAL;
 	if (u->addr)
 		goto out_up;
+
+	if (name_err) {
+		err = name_err == -EEXIST ? -EADDRINUSE : name_err;
+		goto out_up;
+	}
 
 	err = -ENOMEM;
 	addr = kmalloc(sizeof(*addr)+addr_len, GFP_KERNEL);
@@ -1013,11 +1023,11 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	addr->hash = hash ^ sk->sk_type;
 	atomic_set(&addr->refcnt, 1);
 
-	if (sun_path[0]) {
-		struct path path;
+	if (dentry) {
+		struct path u_path;
 		umode_t mode = S_IFSOCK |
 		       (SOCK_INODE(sock)->i_mode & ~current_umask());
-		err = unix_mknod(sun_path, mode, &path);
+		err = unix_mknod(dentry, &path, mode, &u_path);
 		if (err) {
 			if (err == -EEXIST)
 				err = -EADDRINUSE;
@@ -1025,9 +1035,9 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			goto out_up;
 		}
 		addr->hash = UNIX_HASH_SIZE;
-		hash = path.dentry->d_inode->i_ino & (UNIX_HASH_SIZE-1);
+		hash = d_backing_inode(dentry)->i_ino & (UNIX_HASH_SIZE - 1);
 		spin_lock(&unix_table_lock);
-		u->path = path;
+		u->path = u_path;
 		list = &unix_socket_table[hash];
 	} else {
 		spin_lock(&unix_table_lock);
@@ -1050,6 +1060,10 @@ out_unlock:
 	spin_unlock(&unix_table_lock);
 out_up:
 	mutex_unlock(&u->readlock);
+out_path:
+	if (dentry)
+		done_path_create(&path, dentry);
+
 out:
 	return err;
 }
@@ -1486,6 +1500,21 @@ static void unix_destruct_scm(struct sk_buff *skb)
 	sock_wfree(skb);
 }
 
+/*
+ * The "user->unix_inflight" variable is protected by the garbage
+ * collection lock, and we just read it locklessly here. If you go
+ * over the limit, there might be a tiny race in actually noticing
+ * it across threads. Tough.
+ */
+static inline bool too_many_unix_fds(struct task_struct *p)
+{
+	struct user_struct *user = current_user();
+
+	if (unlikely(user->unix_inflight > task_rlimit(p, RLIMIT_NOFILE)))
+		return !capable(CAP_SYS_RESOURCE) && !capable(CAP_SYS_ADMIN);
+	return false;
+}
+
 #define MAX_RECURSION_LEVEL 4
 
 static int unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
@@ -1493,6 +1522,9 @@ static int unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
 	int i;
 	unsigned char max_level = 0;
 	int unix_sock_count = 0;
+
+	if (too_many_unix_fds(current))
+		return -ETOOMANYREFS;
 
 	for (i = scm->fp->count - 1; i >= 0; i--) {
 		struct sock *sk = unix_get_socket(scm->fp->fp[i]);
@@ -1515,10 +1547,8 @@ static int unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
 	if (!UNIXCB(skb).fp)
 		return -ENOMEM;
 
-	if (unix_sock_count) {
-		for (i = scm->fp->count - 1; i >= 0; i--)
-			unix_inflight(scm->fp->fp[i]);
-	}
+	for (i = scm->fp->count - 1; i >= 0; i--)
+		unix_inflight(scm->fp->fp[i]);
 	return max_level;
 }
 
@@ -2101,14 +2131,12 @@ static int unix_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
 		memset(&tmp_scm, 0, sizeof(tmp_scm));
 	}
 
-	err = mutex_lock_interruptible(&u->readlock);
-	if (unlikely(err)) {
-		/* recvmsg() in non blocking mode is supposed to return -EAGAIN
-		 * sk_rcvtimeo is not honored by mutex_lock_interruptible()
-		 */
-		err = noblock ? -EAGAIN : -ERESTARTSYS;
-		goto out;
-	}
+	mutex_lock(&u->readlock);
+
+	if (flags & MSG_PEEK)
+		skip = sk_peek_offset(sk, flags);
+	else
+		skip = 0;
 
 	do {
 		int chunk;
@@ -2144,19 +2172,18 @@ again:
 
 			timeo = unix_stream_data_wait(sk, timeo, last);
 
-			if (signal_pending(current)
-			    ||  mutex_lock_interruptible(&u->readlock)) {
+			if (signal_pending(current)) {
 				err = sock_intr_errno(timeo);
 				goto out;
 			}
 
+			mutex_lock(&u->readlock);
 			continue;
  unlock:
 			unix_state_unlock(sk);
 			break;
 		}
 
-		skip = sk_peek_offset(sk, flags);
 		while (skip >= unix_skb_len(skb)) {
 			skip -= unix_skb_len(skb);
 			last = skb;
@@ -2220,6 +2247,16 @@ again:
 
 			sk_peek_offset_fwd(sk, chunk);
 
+			if (UNIXCB(skb).fp)
+				break;
+
+			skip = 0;
+			last = skb;
+			unix_state_lock(sk);
+			skb = skb_peek_next(skb, &sk->sk_receive_queue);
+			if (skb)
+				goto again;
+			unix_state_unlock(sk);
 			break;
 		}
 	} while (size);

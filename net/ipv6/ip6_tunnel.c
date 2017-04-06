@@ -273,12 +273,12 @@ static int ip6_tnl_create2(struct net_device *dev)
 
 	t = netdev_priv(dev);
 
+	dev->rtnl_link_ops = &ip6_link_ops;
 	err = register_netdevice(dev);
 	if (err < 0)
 		goto out;
 
 	strcpy(t->parms.name, dev->name);
-	dev->rtnl_link_ops = &ip6_link_ops;
 
 	dev_hold(dev);
 	ip6_tnl_link(ip6n, t);
@@ -1087,6 +1087,8 @@ ip4ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	memcpy(&fl6, &t->fl.u.ip6, sizeof(fl6));
 	fl6.flowi6_proto = IPPROTO_IPIP;
 
+	fl6.flowi6_uid = sock_net_uid(dev_net(dev), NULL);
+
 	dsfield = ipv4_get_dsfield(iph);
 
 	if (t->parms.flags & IP6_TNL_F_USE_ORIG_TCLASS)
@@ -1138,6 +1140,7 @@ ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	memcpy(&fl6, &t->fl.u.ip6, sizeof(fl6));
 	fl6.flowi6_proto = IPPROTO_IPV6;
+	fl6.flowi6_uid = sock_net_uid(dev_net(dev), NULL);
 
 	dsfield = ipv6_get_dsfield(ipv6h);
 	if (t->parms.flags & IP6_TNL_F_USE_ORIG_TCLASS)

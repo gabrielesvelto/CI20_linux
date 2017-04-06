@@ -193,6 +193,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.accept_ra_rtr_pref	= 1,
 	.rtr_probe_interval	= 60 * HZ,
 #ifdef CONFIG_IPV6_ROUTE_INFO
+	.accept_ra_rt_info_min_plen = 0,
 	.accept_ra_rt_info_max_plen = 0,
 #endif
 #endif
@@ -232,6 +233,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.accept_ra_rtr_pref	= 1,
 	.rtr_probe_interval	= 60 * HZ,
 #ifdef CONFIG_IPV6_ROUTE_INFO
+	.accept_ra_rt_info_min_plen = 0,
 	.accept_ra_rt_info_max_plen = 0,
 #endif
 #endif
@@ -400,6 +402,7 @@ static struct inet6_dev *ipv6_add_dev(struct net_device *dev)
 	if (err) {
 		ipv6_mc_destroy_dev(ndev);
 		del_timer(&ndev->regen_timer);
+		snmp6_unregister_dev(ndev);
 		goto err_release;
 	}
 	/* protected by rtnl_lock */
@@ -1757,6 +1760,7 @@ void addrconf_dad_failure(struct inet6_ifaddr *ifp)
 	spin_unlock_bh(&ifp->state_lock);
 
 	addrconf_mod_dad_work(ifp, 0);
+	in6_ifa_put(ifp);
 }
 
 /* Join to solicited addr multicast group.
@@ -3378,6 +3382,7 @@ static void addrconf_dad_work(struct work_struct *w)
 		addrconf_dad_begin(ifp);
 		goto out;
 	} else if (action == DAD_ABORT) {
+		in6_ifa_hold(ifp);
 		addrconf_dad_stop(ifp, 1);
 		goto out;
 	}
@@ -4425,6 +4430,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_RTR_PROBE_INTERVAL] =
 		jiffies_to_msecs(cnf->rtr_probe_interval);
 #ifdef CONFIG_IPV6_ROUTE_INFO
+	array[DEVCONF_ACCEPT_RA_RT_INFO_MIN_PLEN] = cnf->accept_ra_rt_info_min_plen;
 	array[DEVCONF_ACCEPT_RA_RT_INFO_MAX_PLEN] = cnf->accept_ra_rt_info_max_plen;
 #endif
 #endif
@@ -4639,6 +4645,22 @@ static int inet6_set_iftoken(struct inet6_dev *idev, struct in6_addr *token)
 	inet6_ifinfo_notify(RTM_NEWLINK, idev);
 	addrconf_verify_rtnl();
 	return 0;
+}
+
+static const struct nla_policy inet6_af_policy[IFLA_INET6_MAX + 1] = {
+	[IFLA_INET6_ADDR_GEN_MODE]	= { .type = NLA_U8 },
+	[IFLA_INET6_TOKEN]		= { .len = sizeof(struct in6_addr) },
+};
+
+static int inet6_validate_link_af(const struct net_device *dev,
+				  const struct nlattr *nla)
+{
+	struct nlattr *tb[IFLA_INET6_MAX + 1];
+
+	if (dev && !__in6_dev_get(dev))
+		return -EAFNOSUPPORT;
+
+	return nla_parse_nested(tb, IFLA_INET6_MAX, nla, inet6_af_policy);
 }
 
 static int inet6_set_link_af(struct net_device *dev, const struct nlattr *nla)
@@ -4932,6 +4954,21 @@ int addrconf_sysctl_forward(struct ctl_table *ctl, int write,
 	return ret;
 }
 
+static
+int addrconf_sysctl_mtu(struct ctl_table *ctl, int write,
+			void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct inet6_dev *idev = ctl->extra1;
+	int min_mtu = IPV6_MIN_MTU;
+	struct ctl_table lctl;
+
+	lctl = *ctl;
+	lctl.extra1 = &min_mtu;
+	lctl.extra2 = idev ? &idev->dev->mtu : NULL;
+
+	return proc_dointvec_minmax(&lctl, write, buffer, lenp, ppos);
+}
+
 static void dev_disable_change(struct inet6_dev *idev)
 {
 	struct netdev_notifier_info info;
@@ -5083,7 +5120,7 @@ static struct addrconf_sysctl_table
 			.data		= &ipv6_devconf.mtu6,
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
-			.proc_handler	= proc_dointvec,
+			.proc_handler	= addrconf_sysctl_mtu,
 		},
 		{
 			.procname	= "accept_ra",
@@ -5229,6 +5266,13 @@ static struct addrconf_sysctl_table
 			.proc_handler	= proc_dointvec_jiffies,
 		},
 #ifdef CONFIG_IPV6_ROUTE_INFO
+		{
+			.procname	= "accept_ra_rt_info_min_plen",
+			.data		= &ipv6_devconf.accept_ra_rt_info_min_plen,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= proc_dointvec,
+		},
 		{
 			.procname	= "accept_ra_rt_info_max_plen",
 			.data		= &ipv6_devconf.accept_ra_rt_info_max_plen,
@@ -5479,6 +5523,7 @@ static struct rtnl_af_ops inet6_ops = {
 	.family		  = AF_INET6,
 	.fill_link_af	  = inet6_fill_link_af,
 	.get_link_af_size = inet6_get_link_af_size,
+	.validate_link_af = inet6_validate_link_af,
 	.set_link_af	  = inet6_set_link_af,
 };
 

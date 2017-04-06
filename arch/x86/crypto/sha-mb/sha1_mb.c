@@ -457,10 +457,10 @@ static int sha_complete_job(struct mcryptd_hash_request_ctx *rctx,
 
 			req = cast_mcryptd_ctx_to_req(req_ctx);
 			if (irqs_disabled())
-				rctx->complete(&req->base, ret);
+				req_ctx->complete(&req->base, ret);
 			else {
 				local_bh_disable();
-				rctx->complete(&req->base, ret);
+				req_ctx->complete(&req->base, ret);
 				local_bh_enable();
 			}
 		}
@@ -932,4 +932,4 @@ module_exit(sha1_mb_mod_fini);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SHA1 Secure Hash Algorithm, multi buffer accelerated");
 
-MODULE_ALIAS("sha1");
+MODULE_ALIAS_CRYPTO("sha1");

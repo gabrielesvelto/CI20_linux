@@ -430,7 +430,8 @@ static void acm_read_bulk_callback(struct urb *urb)
 	if (urb->status) {
 		dev_dbg(&acm->data->dev, "%s - non-zero urb status: %d\n",
 							__func__, urb->status);
-		return;
+		if ((urb->status != -ENOENT) || (urb->actual_length == 0))
+			return;
 	}
 
 	usb_mark_last_busy(acm->dev);
@@ -1091,6 +1092,7 @@ static int acm_probe(struct usb_interface *intf,
 	unsigned long quirks;
 	int num_rx_buf;
 	int i;
+	unsigned int elength = 0;
 	int combined_interfaces = 0;
 	struct device *tty_dev;
 	int rv = -ENOMEM;
@@ -1107,6 +1109,9 @@ static int acm_probe(struct usb_interface *intf,
 	if (quirks == NO_UNION_NORMAL) {
 		data_interface = usb_ifnum_to_if(usb_dev, 1);
 		control_interface = usb_ifnum_to_if(usb_dev, 0);
+		/* we would crash */
+		if (!data_interface || !control_interface)
+			return -ENODEV;
 		goto skip_normal_probe;
 	}
 
@@ -1132,13 +1137,22 @@ static int acm_probe(struct usb_interface *intf,
 	}
 
 	while (buflen > 0) {
+		elength = buffer[0];
+		if (!elength) {
+			dev_err(&intf->dev, "skipping garbage byte\n");
+			elength = 1;
+			goto next_desc;
+		}
 		if (buffer[1] != USB_DT_CS_INTERFACE) {
 			dev_err(&intf->dev, "skipping garbage\n");
 			goto next_desc;
 		}
+		elength = buffer[0];
 
 		switch (buffer[2]) {
 		case USB_CDC_UNION_TYPE: /* we've found it */
+			if (elength < sizeof(struct usb_cdc_union_desc))
+				goto next_desc;
 			if (union_header) {
 				dev_err(&intf->dev, "More than one "
 					"union descriptor, skipping ...\n");
@@ -1147,31 +1161,38 @@ static int acm_probe(struct usb_interface *intf,
 			union_header = (struct usb_cdc_union_desc *)buffer;
 			break;
 		case USB_CDC_COUNTRY_TYPE: /* export through sysfs*/
+			if (elength < sizeof(struct usb_cdc_country_functional_desc))
+				goto next_desc;
 			cfd = (struct usb_cdc_country_functional_desc *)buffer;
 			break;
 		case USB_CDC_HEADER_TYPE: /* maybe check version */
 			break; /* for now we ignore it */
 		case USB_CDC_ACM_TYPE:
+			if (elength < 4)
+				goto next_desc;
 			ac_management_function = buffer[3];
 			break;
 		case USB_CDC_CALL_MANAGEMENT_TYPE:
+			if (elength < 5)
+				goto next_desc;
 			call_management_function = buffer[3];
 			call_interface_num = buffer[4];
 			if ((quirks & NOT_A_MODEM) == 0 && (call_management_function & 3) != 3)
 				dev_err(&intf->dev, "This device cannot do calls on its own. It is not a modem.\n");
 			break;
 		default:
-			/* there are LOTS more CDC descriptors that
+			/*
+			 * there are LOTS more CDC descriptors that
 			 * could legitimately be found here.
 			 */
 			dev_dbg(&intf->dev, "Ignoring descriptor: "
-					"type %02x, length %d\n",
-					buffer[2], buffer[0]);
+					"type %02x, length %ud\n",
+					buffer[2], elength);
 			break;
 		}
 next_desc:
-		buflen -= buffer[0];
-		buffer += buffer[0];
+		buflen -= elength;
+		buffer += elength;
 	}
 
 	if (!union_header) {
@@ -1321,7 +1342,6 @@ made_compressed_probe:
 	spin_lock_init(&acm->write_lock);
 	spin_lock_init(&acm->read_lock);
 	mutex_init(&acm->mutex);
-	acm->rx_endpoint = usb_rcvbulkpipe(usb_dev, epread->bEndpointAddress);
 	acm->is_int_ep = usb_endpoint_xfer_int(epread);
 	if (acm->is_int_ep)
 		acm->bInterval = epread->bInterval;
@@ -1371,14 +1391,14 @@ made_compressed_probe:
 		urb->transfer_dma = rb->dma;
 		if (acm->is_int_ep) {
 			usb_fill_int_urb(urb, acm->dev,
-					 acm->rx_endpoint,
+					 usb_rcvintpipe(usb_dev, epread->bEndpointAddress),
 					 rb->base,
 					 acm->readsize,
 					 acm_read_bulk_callback, rb,
 					 acm->bInterval);
 		} else {
 			usb_fill_bulk_urb(urb, acm->dev,
-					  acm->rx_endpoint,
+					  usb_rcvbulkpipe(usb_dev, epread->bEndpointAddress),
 					  rb->base,
 					  acm->readsize,
 					  acm_read_bulk_callback, rb);
@@ -1406,6 +1426,8 @@ made_compressed_probe:
 				usb_sndbulkpipe(usb_dev, epwrite->bEndpointAddress),
 				NULL, acm->writesize, acm_write_bulk, snd);
 		snd->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+		if (quirks & SEND_ZERO_PACKET)
+			snd->urb->transfer_flags |= URB_ZERO_PACKET;
 		snd->instance = acm;
 	}
 
@@ -1467,6 +1489,11 @@ skip_countries:
 	if (IS_ERR(tty_dev)) {
 		rv = PTR_ERR(tty_dev);
 		goto alloc_fail8;
+	}
+
+	if (quirks & CLEAR_HALT_CONDITIONS) {
+		usb_clear_halt(usb_dev, usb_rcvbulkpipe(usb_dev, epread->bEndpointAddress));
+		usb_clear_halt(usb_dev, usb_sndbulkpipe(usb_dev, epwrite->bEndpointAddress));
 	}
 
 	return 0;
@@ -1700,6 +1727,7 @@ static const struct usb_device_id acm_ids[] = {
 	{ USB_DEVICE(0x20df, 0x0001), /* Simtec Electronics Entropy Key */
 	.driver_info = QUIRK_CONTROL_LINE_STATE, },
 	{ USB_DEVICE(0x2184, 0x001c) },	/* GW Instek AFG-2225 */
+	{ USB_DEVICE(0x2184, 0x0036) },	/* GW Instek AFG-125 */
 	{ USB_DEVICE(0x22b8, 0x6425), /* Motorola MOTOMAGX phones */
 	},
 	/* Motorola H24 HSPA module: */
@@ -1744,6 +1772,10 @@ static const struct usb_device_id acm_ids[] = {
 	},
 	{ USB_DEVICE(0x1576, 0x03b1), /* Maretron USB100 */
 	.driver_info = NO_UNION_NORMAL, /* reports zero length descriptor */
+	},
+
+	{ USB_DEVICE(0x2912, 0x0001), /* ATOL FPrint */
+	.driver_info = CLEAR_HALT_CONDITIONS,
 	},
 
 	/* Nokia S60 phones expose two ACM channels. The first is
@@ -1834,6 +1866,16 @@ static const struct usb_device_id acm_ids[] = {
 	},
 #endif
 
+	/*Samsung phone in firmware update mode */
+	{ USB_DEVICE(0x04e8, 0x685d),
+	.driver_info = IGNORE_DEVICE,
+	},
+
+	/* Exclude Infineon Flash Loader utility */
+	{ USB_DEVICE(0x058b, 0x0041),
+	.driver_info = IGNORE_DEVICE,
+	},
+
 	/* control interfaces without any protocol set */
 	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
 		USB_CDC_PROTO_NONE) },
@@ -1851,6 +1893,10 @@ static const struct usb_device_id acm_ids[] = {
 		USB_CDC_ACM_PROTO_AT_3G) },
 	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
 		USB_CDC_ACM_PROTO_AT_CDMA) },
+
+	{ USB_DEVICE(0x1519, 0x0452), /* Intel 7260 modem */
+	.driver_info = SEND_ZERO_PACKET,
+	},
 
 	{ }
 };
