@@ -275,6 +275,7 @@ config MACH_JZ4780
 	select LIBFDT
 	select SYS_SUPPORTS_SMP
 	select MIPS_EXECUTE_ARM
+	select HAVE_ARCH_HARDENED_USERCOPY
 
 config LANTIQ
 	bool "Lantiq based platforms"
