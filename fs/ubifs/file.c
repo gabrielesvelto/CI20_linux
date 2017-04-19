@@ -1606,6 +1606,23 @@ long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -EINVAL;
 
 	switch (mode) {
+	case FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE:
+		{
+			loff_t new_len = len;
+
+			if (new_size > ui->ui_size)
+				new_len = ui->ui_size - offset;
+
+			if (offset >= ui->ui_size) {
+				ubifs_err(c, "Invalid offset value");
+				ret = -EINVAL;
+				break;
+			}
+
+			ret = ubifs_write_zeros(file, offset, new_len);
+
+			break;
+		}
 	case FALLOC_FL_ZERO_RANGE:
 		{
 			if (offset > ui->ui_size)
