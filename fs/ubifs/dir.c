@@ -260,7 +260,7 @@ static int ubifs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	dbg_gen("dent '%pd', mode %#hx in dir ino %lu",
 		dentry, mode, dir->i_ino);
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -528,7 +528,7 @@ static int ubifs_link(struct dentry *old_dentry, struct inode *dir,
 	if (err)
 		return err;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -584,7 +584,7 @@ static int ubifs_unlink(struct inode *dir, struct dentry *dentry)
 	if (err)
 		return err;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err) {
 		if (err != -ENOSPC)
 			return err;
@@ -673,7 +673,7 @@ static int ubifs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (err)
 		return err;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err) {
 		if (err != -ENOSPC)
 			return err;
@@ -728,7 +728,7 @@ static int ubifs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	dbg_gen("dent '%pd', mode %#hx in dir ino %lu",
 		dentry, mode, dir->i_ino);
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -801,7 +801,7 @@ static int ubifs_mknod(struct inode *dir, struct dentry *dentry,
 		devlen = ubifs_encode_dev(dev, rdev);
 	}
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err) {
 		kfree(dev);
 		return err;
@@ -874,7 +874,7 @@ static int ubifs_symlink(struct inode *dir, struct dentry *dentry,
 	if (len > UBIFS_MAX_INO_DATA)
 		return -ENAMETOOLONG;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -1014,10 +1014,10 @@ static int ubifs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			return err;
 	}
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
-	err = ubifs_budget_space(c, &ino_req);
+	err = ubifs_budget_space(c, &ino_req, 0);
 	if (err) {
 		ubifs_release_budget(c, &req);
 		return err;

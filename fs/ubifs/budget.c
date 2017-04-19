@@ -303,7 +303,7 @@ static int can_use_rp(struct ubifs_info *c)
  * This function returns zero in case of success, and %-ENOSPC in case of
  * failure.
  */
-static int do_budget_space(struct ubifs_info *c)
+static int do_budget_space(struct ubifs_info *c, struct ubifs_inode *ui)
 {
 	long long outstanding, available;
 	int lebs, rsvd_idx_lebs, min_idx_lebs;
@@ -321,7 +321,7 @@ static int do_budget_space(struct ubifs_info *c)
 	 * The number of LEBs that are available to be used by the index is:
 	 *
 	 *    @c->lst.empty_lebs + @c->freeable_cnt + @c->idx_gc_cnt -
-	 *    @c->lst.taken_empty_lebs
+	 *    @c->lst.taken_empty_lebs - @c->lst.reserved_empty_lebs
 	 *
 	 * @c->lst.empty_lebs are available because they are empty.
 	 * @c->freeable_cnt are available because they contain only free and
@@ -330,6 +330,8 @@ static int do_budget_space(struct ubifs_info *c)
 	 * before they can be used. And the in-the-gaps method will grab these
 	 * if it needs them. @c->lst.taken_empty_lebs are empty LEBs that have
 	 * already been allocated for some purpose.
+	 * @c->lst.reserved_empty_lebs are empty LEBs reserved for this
+	 * particular ubifs_node.
 	 *
 	 * Note, @c->idx_gc_cnt is included to both @c->lst.empty_lebs (because
 	 * these LEBs are empty) and to @c->lst.taken_empty_lebs (because they
@@ -340,7 +342,10 @@ static int do_budget_space(struct ubifs_info *c)
 	 * comment in 'ubifs_find_free_space()'.
 	 */
 	lebs = c->lst.empty_lebs + c->freeable_cnt + c->idx_gc_cnt -
-	       c->lst.taken_empty_lebs;
+	       c->lst.taken_empty_lebs - c->lst.reserved_empty_lebs;
+	if (ui)
+		lebs += ui->reserved_leb_cnt;
+
 	if (unlikely(rsvd_idx_lebs > lebs)) {
 		dbg_budg("out of indexing space: min_idx_lebs %d (old %d), rsvd_idx_lebs %d",
 			 min_idx_lebs, c->bi.min_idx_lebs, rsvd_idx_lebs);
@@ -422,6 +427,29 @@ static int calc_dd_growth(const struct ubifs_info *c,
 	return dd_growth;
 }
 
+static void ubifs_update_reserved(struct ubifs_info *c, struct ubifs_inode *ui)
+{
+	loff_t lebs_extra, lebs_needed, lebs_used, remainder;
+	loff_t usable_leb_size = c->leb_size - c->leb_overhead;
+
+	lebs_used = div_u64(ui->ui_size, usable_leb_size);
+	div_u64_rem(ui->ui_size, usable_leb_size, &remainder);
+	if (remainder)
+		lebs_used++;
+
+	lebs_needed = div_u64(ui->reserved_ui_size, usable_leb_size);
+	div_u64_rem(ui->reserved_ui_size, usable_leb_size, &remainder);
+	if (remainder)
+		lebs_needed++;
+
+	lebs_extra = lebs_used + ui->reserved_leb_cnt - lebs_needed;
+
+	if (lebs_extra > 0) {
+		c->lst.reserved_empty_lebs -= lebs_extra;
+		ui->reserved_leb_cnt -= lebs_extra;
+	}
+}
+
 /**
  * ubifs_budget_space - ensure there is enough space to complete an operation.
  * @c: UBIFS file-system description object
@@ -435,7 +463,8 @@ static int calc_dd_growth(const struct ubifs_info *c,
  * %-ENOSPC if there is no free space and other negative error codes in case of
  * failures.
  */
-int ubifs_budget_space(struct ubifs_info *c, struct ubifs_budget_req *req)
+int ubifs_budget_space(struct ubifs_info *c, struct ubifs_budget_req *req,
+	struct ubifs_inode *ui)
 {
 	int err, idx_growth, data_growth, dd_growth, retried = 0;
 
@@ -472,7 +501,11 @@ again:
 	c->bi.data_growth += data_growth;
 	c->bi.dd_growth += dd_growth;
 
-	err = do_budget_space(c);
+	if (ui && ui->reserved_leb_cnt)
+		ubifs_update_reserved(c, ui);
+
+	err = do_budget_space(c, ui);
+
 	if (likely(!err)) {
 		req->idx_growth = idx_growth;
 		req->data_growth = data_growth;
@@ -700,7 +733,7 @@ long long ubifs_get_free_space_nolock(struct ubifs_info *c)
 	else
 		rsvd_idx_lebs = 0;
 	lebs = c->lst.empty_lebs + c->freeable_cnt + c->idx_gc_cnt -
-	       c->lst.taken_empty_lebs;
+	       c->lst.taken_empty_lebs - c->lst.reserved_empty_lebs;
 	lebs -= rsvd_idx_lebs;
 	available += lebs * (c->dark_wm - c->leb_overhead);
 
