@@ -50,6 +50,7 @@
  */
 
 #include "ubifs.h"
+#include <linux/falloc.h>
 #include <linux/mount.h>
 #include <linux/slab.h>
 #include <linux/migrate.h>
@@ -1585,6 +1586,44 @@ out_unlock:
 	return err;
 }
 
+/*
+ * TODO: Implement optimization that avoids actual writing
+ * of the whole data to disk.
+ */
+long ubifs_write_zeros(struct file *file, loff_t offset, loff_t len)
+{
+	loff_t i;
+	loff_t counter = len / UBIFS_BLOCK_SIZE;
+	char zero_buffer[UBIFS_BLOCK_SIZE] = {0};
+	int remainder = len % UBIFS_BLOCK_SIZE;;
+	long ret = 0, write_ret;
+	struct ubifs_info *c = file_inode(file)->i_sb->s_fs_info;
+
+	for (i = 0; i < counter; i++) {
+		write_ret = __vfs_write(file, zero_buffer, UBIFS_BLOCK_SIZE, &offset);
+		if(write_ret <= 0) {
+			ret = write_ret;
+			goto error;
+		}
+		ret += write_ret;
+	}
+
+	if (remainder) {
+		write_ret = __vfs_write(file, zero_buffer, remainder, &offset);
+		if (write_ret <= 0) {
+			ret = write_ret;
+			goto error;
+		}
+		ret += write_ret;
+	}
+
+	return ret;
+
+error:
+	ubifs_err(c, "Writing zeros error: %ld", ret);
+	return ret;
+}
+
 long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
 	int ret = 0;
@@ -1598,6 +1637,28 @@ long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -EINVAL;
 
 	switch (mode) {
+	case FALLOC_FL_ZERO_RANGE:
+		{
+			if (offset > ui->ui_size)
+				offset = (loff_t) ui->ui_size;
+
+			if (new_size <= ui->ui_size) {
+				ret = ubifs_write_zeros(file, offset, len);
+				break;
+			} else {
+				loff_t overwrite_len = ui->ui_size - offset;
+
+				if (overwrite_len > 0) {
+					ret = ubifs_write_zeros(file, offset, overwrite_len);
+					if (ret <= 0)
+						break;
+				}
+
+				/*
+				 * Fall through
+				 */
+			}
+		}
 	case 0:
 		if (new_size > ui->ui_size) {
 			attr.ia_size = new_size;
