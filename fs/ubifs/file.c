@@ -247,7 +247,7 @@ static int write_begin_slow(struct address_space *mapping,
 		/* We are appending data, budget for inode change */
 		req.dirtied_ino = 1;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (unlikely(err))
 		return err;
 
@@ -390,7 +390,7 @@ static int allocate_budget(struct ubifs_info *c, struct page *page,
 		}
 	}
 
-	return ubifs_budget_space(c, &req);
+	return ubifs_budget_space(c, &req, ui);
 }
 
 /*
@@ -1128,7 +1128,7 @@ static int do_truncation(struct ubifs_info *c, struct inode *inode,
 	req.dirtied_ino = 1;
 	/* A funny way to budget for truncation node */
 	req.dirtied_ino_d = UBIFS_TRUN_NODE_SZ;
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (err) {
 		/*
 		 * Treat truncations to zero as deletion and always allow them,
@@ -1220,7 +1220,7 @@ static int do_setattr(struct ubifs_info *c, struct inode *inode,
 	struct ubifs_budget_req req = { .dirtied_ino = 1,
 				.dirtied_ino_d = ALIGN(ui->data_len, 8) };
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (err)
 		return err;
 
@@ -1385,7 +1385,7 @@ static int update_mctime(struct inode *inode)
 		struct ubifs_budget_req req = { .dirtied_ino = 1,
 				.dirtied_ino_d = ALIGN(ui->data_len, 8) };
 
-		err = ubifs_budget_space(c, &req);
+		err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 		if (err)
 			return err;
 
@@ -1505,7 +1505,7 @@ static int ubifs_vm_page_mkwrite(struct vm_area_struct *vma,
 		 */
 		req.dirtied_ino = 1;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (unlikely(err)) {
 		if (err == -ENOSPC)
 			ubifs_warn(c, "out of space for mmapped file (inode number %lu)",
@@ -1593,6 +1593,46 @@ error:
 	return ret;
 }
 
+/*
+ * Has to be called under c->space_lock
+ */
+static long ubifs_preallocate(struct ubifs_inode *ui, struct ubifs_info *c,
+	loff_t new_size)
+{
+	if (new_size > ui->reserved_ui_size) {
+		loff_t lebs_available, lebs_needed, lebs_used, remainder;
+		loff_t usable_leb_size = c->leb_size - c->leb_overhead;
+
+		lebs_available = c->lst.empty_lebs - c->lst.taken_empty_lebs -
+			c->lst.reserved_empty_lebs;
+
+		lebs_used = div_u64(ui->ui_size, usable_leb_size);
+		div_u64_rem(ui->ui_size, usable_leb_size, &remainder);
+		if (remainder)
+			lebs_used++;
+
+		lebs_needed = div_u64(new_size, usable_leb_size) - lebs_used -
+			ui->reserved_leb_cnt;
+		div_u64_rem(new_size, usable_leb_size, &remainder);
+		if (remainder)
+			lebs_needed++;
+
+		if (lebs_available <= lebs_needed) {
+			ubifs_err(c, "Not enough LEBs available");
+			return -ENOSPC;
+		}
+
+		if (lebs_needed > 0) {
+			c->lst.reserved_empty_lebs += lebs_needed;
+			ui->reserved_leb_cnt += lebs_needed;
+		}
+
+		ui->reserved_ui_size = new_size;
+	}
+
+	return 0;
+}
+
 long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
 	int ret = 0;
@@ -1606,6 +1646,22 @@ long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -EINVAL;
 
 	switch (mode) {
+	case FALLOC_FL_KEEP_SIZE:
+
+		ret = inode_newsize_ok(inode, new_size);
+		if (ret) {
+			ubifs_err(c, "File size error: %d", ret);
+			break;
+		}
+
+		spin_lock(&c->space_lock);
+		if(new_size >= ui->ui_size &&
+			new_size - ui->ui_size <= ubifs_get_free_space_nolock(c)) {
+			ret = ubifs_preallocate(ui, c, new_size);
+		}
+		spin_unlock(&c->space_lock);
+
+		break;
 	case FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE:
 		{
 			loff_t new_len = len;
@@ -1681,6 +1737,22 @@ static int ubifs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
+static int ubifs_release_file(struct inode *inode, struct file *file)
+{
+	struct ubifs_inode *ui = ubifs_inode(inode);
+	struct ubifs_info *c = inode->i_sb->s_fs_info;
+
+	spin_lock(&c->space_lock);
+	if (ui->reserved_ui_size) {
+		c->lst.reserved_empty_lebs -= ui->reserved_leb_cnt;
+		ui->reserved_leb_cnt = 0;
+		ui->reserved_ui_size = 0;
+	}
+	spin_unlock(&c->space_lock);
+
+	return 0;
+}
+
 const struct address_space_operations ubifs_file_address_operations = {
 	.readpage       = ubifs_readpage,
 	.writepage      = ubifs_writepage,
@@ -1725,6 +1797,7 @@ const struct file_operations ubifs_file_operations = {
 	.unlocked_ioctl = ubifs_ioctl,
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
+	.release	= ubifs_release_file,
 	.fallocate	= ubifs_fallocate,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = ubifs_compat_ioctl,

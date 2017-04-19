@@ -367,6 +367,8 @@ struct ubifs_gced_idx_leb {
  *                 inodes
  * @ui_size: inode size used by UBIFS when writing to flash
  * @flags: inode flags (@UBIFS_COMPR_FL, etc)
+ * @reserved_leb_cnt: number of pre-allocated LEBs
+ * @reserved_ui_size: size that is pre-allocated
  * @compr_type: default compression type used for this inode
  * @last_page_read: page number of last page read (for bulk read)
  * @read_in_a_row: number of consecutive pages read in a row (for bulk read)
@@ -418,6 +420,8 @@ struct ubifs_inode {
 	loff_t synced_i_size;
 	loff_t ui_size;
 	int flags;
+	int reserved_leb_cnt;
+	loff_t reserved_ui_size;
 	pgoff_t last_page_read;
 	pgoff_t read_in_a_row;
 	int data_len;
@@ -507,6 +511,7 @@ struct ubifs_lpt_lprops {
  * struct ubifs_lp_stats - statistics of eraseblocks in the main area.
  * @empty_lebs: number of empty LEBs
  * @taken_empty_lebs: number of taken LEBs
+ * @reserved_empty_lebs: number of reserved LEBs
  * @idx_lebs: number of indexing LEBs
  * @total_free: total free space in bytes (includes all LEBs)
  * @total_dirty: total dirty space in bytes (includes all LEBs)
@@ -532,6 +537,7 @@ struct ubifs_lpt_lprops {
 struct ubifs_lp_stats {
 	int empty_lebs;
 	int taken_empty_lebs;
+	int reserved_empty_lebs;
 	int idx_lebs;
 	long long total_free;
 	long long total_dirty;
@@ -1556,7 +1562,8 @@ int ubifs_jnl_change_xattr(struct ubifs_info *c, const struct inode *inode1,
 			   const struct inode *inode2);
 
 /* budget.c */
-int ubifs_budget_space(struct ubifs_info *c, struct ubifs_budget_req *req);
+int ubifs_budget_space(struct ubifs_info *c, struct ubifs_budget_req *req,
+	struct ubifs_inode *ui);
 void ubifs_release_budget(struct ubifs_info *c, struct ubifs_budget_req *req);
 void ubifs_release_dirty_inode_budget(struct ubifs_info *c,
 				      struct ubifs_inode *ui);
