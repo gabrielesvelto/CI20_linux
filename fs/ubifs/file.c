@@ -1558,20 +1558,23 @@ long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
 	int ret = 0;
 	struct iattr attr;
-	struct ubifs_info *c;
+	struct inode *inode = file_inode(file);
+	struct ubifs_inode *ui = ubifs_inode(inode);
+	struct ubifs_info *c = inode->i_sb->s_fs_info;
 	loff_t new_size = offset + len;
+
+	if (offset < 0 || len <= 0)
+		return -EINVAL;
 
 	switch (mode) {
 	case 0:
-		if (new_size > file_inode(file)->i_size) {
+		if (new_size > ui->ui_size) {
 			attr.ia_size = new_size;
 			attr.ia_valid = ATTR_SIZE;
 
 			ret = ubifs_setattr(file->f_path.dentry, &attr);
-			if (ret) {
-				c = file_inode(file)->i_sb->s_fs_info;
+			if (ret)
 				ubifs_err(c, "failed to set size attribute");
-			}
 		}
 
 		break;
