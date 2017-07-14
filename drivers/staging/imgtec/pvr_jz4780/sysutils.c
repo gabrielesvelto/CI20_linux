@@ -130,7 +130,7 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 #if defined(SYS_XB47_HAS_DVFS_FRAMEWORK)
 	psTimingInfo->ui32CoreClockSpeed =
 		gpsSysSpecificData->pui32SGXFreqList[gpsSysSpecificData->ui32SGXFreqListIndex];
-#else 
+#else
 	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
 #endif
 	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ;
@@ -139,7 +139,7 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 	psTimingInfo->bEnableActivePM = IMG_TRUE;
 #else
 	psTimingInfo->bEnableActivePM = IMG_FALSE;
-#endif 
+#endif
 	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS;
 }
 
@@ -183,7 +183,7 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 			}
 		}
 	}
-#endif 
+#endif
 
 	SysEnableSGXInterrupts(psSysData);
 
@@ -210,7 +210,6 @@ IMG_VOID DisableSGXClocks(SYS_DATA *psSysData)
 
 		pdata = (struct gpu_platform_data *)gpsPVRLDMDev->dev.platform_data;
 
-		
 		if (psSysSpecData->ui32SGXFreqListIndex != 0)
 		{
 			PVR_ASSERT(pdata->device_scale != IMG_NULL);
@@ -280,7 +279,7 @@ PVRSRV_ERROR SysDvfsInitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 {
 #if !defined(SYS_XB47_HAS_DVFS_FRAMEWORK)
 	PVR_UNREFERENCED_PARAMETER(psSysSpecificData);
-#else 
+#else
 	IMG_UINT32 i, *freq_list;
 	IMG_INT32 opp_count;
 	unsigned long freq;
@@ -295,7 +294,6 @@ PVRSRV_ERROR SysDvfsInitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 		return PVRSRV_ERROR_NOT_SUPPORTED;
 	}
 
-	
 	freq_list = kmalloc((opp_count + 1) * sizeof(IMG_UINT32), GFP_ATOMIC);
 	if (!freq_list)
 	{
@@ -304,7 +302,6 @@ PVRSRV_ERROR SysDvfsInitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
-	
 	freq = 0;
 	for (i = 0; i < opp_count; i++)
 	{
@@ -325,9 +322,8 @@ PVRSRV_ERROR SysDvfsInitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 	psSysSpecificData->ui32SGXFreqListSize = opp_count + 1;
 	psSysSpecificData->pui32SGXFreqList = freq_list;
 
-	
 	psSysSpecificData->ui32SGXFreqListIndex = opp_count;
-#endif 
+#endif
 	return PVRSRV_OK;
 }
 
@@ -335,7 +331,7 @@ PVRSRV_ERROR SysDvfsDeinitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 {
 #if !defined(SYS_XB47_HAS_DVFS_FRAMEWORK)
 	PVR_UNREFERENCED_PARAMETER(psSysSpecificData);
-#else 
+#else
 	if (psSysSpecificData->ui32SGXFreqListIndex != 0)
 	{
 		struct gpu_platform_data *pdata;
@@ -362,6 +358,6 @@ PVRSRV_ERROR SysDvfsDeinitialize(SYS_SPECIFIC_DATA *psSysSpecificData)
 	kfree(psSysSpecificData->pui32SGXFreqList);
 	psSysSpecificData->pui32SGXFreqList = 0;
 	psSysSpecificData->ui32SGXFreqListSize = 0;
-#endif 
+#endif
 	return PVRSRV_OK;
 }

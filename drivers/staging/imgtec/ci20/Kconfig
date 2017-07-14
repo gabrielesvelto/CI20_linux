@@ -1,5 +1,0 @@
-config POWERVR_CI20
-	tristate "MIPS Creator CI20 graphics support"
-	depends on DRM && ION && JZ4780_CI20
-	select POWERVR_SGX
-	default n

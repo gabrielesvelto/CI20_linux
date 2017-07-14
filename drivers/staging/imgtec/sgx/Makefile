@@ -4,7 +4,7 @@ ccflags-y += -include $(srctree)/drivers/staging/imgtec/config_kernel.h \
  -I$(srctree)/$(src)/hwdefs
 ccflags-$(CONFIG_X86) += -mno-soft-float
 
-ccflags-$(CONFIG_POWERVR_CI20) += -I$(srctree)/drivers/staging/imgtec/ci20
+ccflags-$(CONFIG_POWERVR_JZ4780) += -I$(srctree)/drivers/staging/imgtec/pvr_jz4780
 
 obj-$(CONFIG_POWERVR_SGX) += pvrsrvkm.o
 obj-$(CONFIG_POWERVR_SGX_PDUMP) += dbgdrv.o

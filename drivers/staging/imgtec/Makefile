@@ -1,2 +1,2 @@
 obj-y += sgx/
-obj-y += ci20/
+obj-y += pvr_jz4780/

@@ -105,7 +105,7 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData);
 #define	SYS_SPECIFIC_DATA_CLEAR(psSysSpecData, flag) ((IMG_VOID)((psSysSpecData)->ui32SysSpecificData &= ~(flag)))
 
 #define	SYS_SPECIFIC_DATA_TEST(psSysSpecData, flag) (((psSysSpecData)->ui32SysSpecificData & (flag)) != 0)
- 
+
 typedef struct _SYS_SPECIFIC_DATA_TAG_
 {
 	IMG_UINT32	ui32SysSpecificData;
@@ -152,6 +152,4 @@ PVRSRV_ERROR SysDvfsDeinitialize(SYS_SPECIFIC_DATA *psSysSpecificData);
 }
 #endif
 
-#endif	
-
-
+#endif
