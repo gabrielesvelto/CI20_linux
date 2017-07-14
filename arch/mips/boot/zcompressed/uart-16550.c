@@ -18,9 +18,15 @@
 #endif
 
 #if defined(CONFIG_MACH_JZ4740) || defined(CONFIG_MACH_JZ4780)
-#include <asm/mach-jz4740/base.h>
-#define PORT(offset) (CKSEG1ADDR(JZ4740_UART0_BASE_ADDR) + (4 * offset))
+#include <dt-bindings/soc/base.h>
+
+#ifdef CONFIG_JZ4780_NPM801
+#define PORT(offset) (CKSEG1ADDR(UART3_IOBASE) + (4 * offset))
+#else
+#define PORT(offset) (CKSEG1ADDR(UART0_IOBASE) + (4 * offset))
 #endif
+
+#endif /* CONFIG_MACH_JZ4740 || CONFIG_MACH_JZ4780 */
 
 #ifdef CONFIG_CPU_XLR
 #define UART0_BASE  0x1EF14000

@@ -263,12 +263,12 @@
 
 			pinfunc_uart3: uart3 {
 				pins_uart3_data: uart3-data {
-					ingenic,pins = <&gpd 12 0 &pincfg_pull_down /* rxd */
+					ingenic,pins = <&gpd 12 1 &pincfg_pull_down /* rxd */
 							&gpe  5 1 &pincfg_nobias>;  /* txd */
 				};
 
 				pins_uart3_dataplusflow: uart3-dataplusflow {
-					ingenic,pins = <&gpd 12 0 &pincfg_pull_down /* rxd */
+					ingenic,pins = <&gpd 12 1 &pincfg_pull_down /* rxd */
 							&gpe  5 1 &pincfg_nobias    /* txd */
 							&gpe  8 0 &pincfg_nobias    /* cts */
 							&gpe  9 0 &pincfg_nobias>;  /* rts */

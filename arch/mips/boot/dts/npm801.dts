@@ -24,20 +24,13 @@
 		       0x30000000 0x30000000>;
 	};
 
-	audio: audio-ci20 {
-		compatible = "ingenic,ci20-audio";
+	audio: audio-npm801 {
+		compatible = "ingenic,npm801-audio";
 		ingenic,i2s-controller = <&i2s>;
 		ingenic,codec = <&codec>;
 	};
 
-	eth0_power: fixedregulator@0 {
-		compatible = "regulator-fixed";
-		regulator-name = "eth0_power";
-		gpio = <&gpb 25 GPIO_ACTIVE_LOW>;
-		enable-active-high;
-	};
-
-	hdmi_power: fixedregulator@1 {
+	hdmi_power: fixedregulator@0 {
 		compatible = "regulator-fixed";
 		regulator-name = "hdmi_power";
 		gpio = <&gpa 25 GPIO_ACTIVE_LOW>;
@@ -45,7 +38,7 @@
 		regulator-always-on;
 	};
 
-	wifi_power: fixedregulator@2 {
+	wifi_power: fixedregulator@1 {
 		compatible = "regulator-fixed";
 		regulator-name = "wifi_power_gpio";
 		gpio = <&gpb 19 0>;
@@ -57,7 +50,7 @@
 	};
 
 	/* HACK: Keeping wifi reset high. No simple driver fix */
-	wifi_reset: fixedregulator@3 {
+	wifi_reset: fixedregulator@2 {
 		compatible = "regulator-fixed";
 		regulator-name = "wifi_reset_gpio";
 		gpio = <&gpf 7 0>;
@@ -66,7 +59,7 @@
 	};
 
 	/* HACK: Keeping BT reset high. No simple driver fix */
-	bt_reset: fixedregulator@4 {
+	bt_reset: fixedregulator@3 {
 		compatible = "regulator-fixed";
 		regulator-name = "bt_reset_gpio";
 		gpio = <&gpf 8 0>;
@@ -74,7 +67,7 @@
 	};
 
 	/* HACK: Keeping BT_reg_on high. No simple driver fix */
-	bt_reg_on: fixedregulator@5 {
+	bt_reg_on: fixedregulator@4 {
 		compatible = "regulator-fixed";
 		regulator-name = "bt_reg_on_gpio";
 		gpio = <&gpf 4 0>;
@@ -83,7 +76,7 @@
 	};
 
 	/* HACK: Keeping BT wake high. No simple driver fix */
-	bt_wake: fixedregulator@6 {
+	bt_wake: fixedregulator@5 {
 		compatible = "regulator-fixed";
 		regulator-name = "bt_wake_gpio";
 		gpio = <&gpf 5 0>;
@@ -103,32 +96,12 @@
 		vrfkill-supply = <&bt_reset>;
 	};
 
-	leds {
-		compatible = "gpio-leds";
-		led3 {
-			gpios = <&gpc 0 0>;
-			linux,default-trigger = "cpu0";
-		};
-		led2 {
-			gpios = <&gpc 1 0>;
-			linux,default-trigger = "cpu1";
-		};
-		led1 {
-			gpios = <&gpc 2 0>;
-			linux,default-trigger = "nand-disk";
-		};
-		led0 {
-			gpios = <&gpc 3 0>;
-			linux,default-trigger = "none";
-		};
-	};
-
 	gpio-keys {
 		compatible = "gpio-keys";
 
 		power {
 			label = "Power Button";
-			gpios = <&gpd  17 0>;
+			gpios = <&gpa  30 0>;
 			linux,code = <KEY_POWER>;
 			gpio-key,wakeup;
 		};
@@ -157,98 +130,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_msc1_pd>;
 	vmmc-supply = <&wifi_power>;
-};
-
-&ehci {
-	ingenic,vbus-gpio = <&gpf 15 0>;
-};
-
-&ohci {
-	ingenic,vbus-gpio = <&gpf 15 0>;
-};
-
-&nemc {
-	/*
-	 * Only CLE/ALE are needed for the devices that are connected, rather
-	 * than the full address line set.
-	 */
-	pinctrl-names = "default";
-	pinctrl-0 = <&pins_nemc_data
-		     &pins_nemc_cle_ale
-		     &pins_nemc_rd_we
-		     &pins_nemc_frd_fwe>;
-
-	nand: nand@1 {
-		compatible = "ingenic,jz4780-nand";
-		reg = <1 0 0x1000000>;
-
-		ingenic,nemc-tAS = <10>;
-		ingenic,nemc-tAH = <5>;
-		ingenic,nemc-tBP = <10>;
-		ingenic,nemc-tAW = <15>;
-		ingenic,nemc-tSTRV = <100>;
-
-		ingenic,bch-device = <&bch>;
-		ingenic,ecc-size = <1024>;
-		ingenic,ecc-strength = <24>;
-
-		ingenic,busy-gpio = <&gpa 20 GPIO_ACTIVE_LOW>;
-		ingenic,wp-gpio = <&gpf 22 GPIO_ACTIVE_LOW>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&pins_nemc_cs1>;
-
-		#address-cells = <2>;
-		#size-cells = <2>;
-
-		partition@0 {
-			label = "u-boot-spl";
-			reg = <0x0 0x0 0x0 0x800000>;
-		};
-
-		partition@0x800000 {
-			label = "u-boot";
-			reg = <0x0 0x800000 0x0 0x200000>;
-		};
-
-		partition@0xa00000 {
-			label = "u-boot-env";
-			reg = <0x0 0xa00000 0x0 0x200000>;
-		};
-
-		partition@0xc00000 {
-			label = "boot";
-			reg = <0x0 0xc00000 0x0 0x4000000>;
-		};
-
-		partition@0x8c00000 {
-			label = "system";
-			reg = <0x0 0x4c00000 0x1 0xfb400000>;
-		};
-	};
-
-	dm9000@6 {
-		compatible = "davicom,dm9000";
-		davicom,no-eeprom;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&pins_nemc_cs6>;
-
-		reg = <6 0x0 1   /* addr */
-		       6 0x2 1>; /* data */
-
-		ingenic,nemc-tAS = <15>;
-		ingenic,nemc-tAH = <10>;
-		ingenic,nemc-tBP = <20>;
-		ingenic,nemc-tAW = <50>;
-		ingenic,nemc-tSTRV = <100>;
-
-		reset-gpios = <&gpf 12 GPIO_ACTIVE_HIGH>;
-		vcc-supply = <&eth0_power>;
-
-		interrupt-parent = <&gpe>;
-		interrupts = <19 0x4>;
-	};
 };
 
 &uart0 {
@@ -356,25 +237,6 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c2_data>;
-
-	ov5640@0x3C {
-		compatible = "omnivision,ov5640";
-		reg = <0x3C>;
-
-		core-supply = <&vcim1v5_reg>;
-		analog-supply = <&vcim2v8_reg>;
-
-		gpio-enable = <&gpb 18 0>;
-		gpio-reset = <&gpb 26 0>;
-
-		remote = <&cim>;
-		port {
-			ov5640_1: endpoint {
-				bus-width = <8>;
-				remote-endpoint = <&cim>;
-			};
-		};
-	};
 };
 
 &i2c3 {
@@ -387,22 +249,4 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c4_data_pf>;
-};
-
-&cim {
-	clock-frequency = <24000000>;
-
-	port {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		/* Parallel bus endpoint */
-		camera: endpoint@0 {
-			reg = <0>;		/* Local endpoint # */
-			remote-endpoint = <&ov5640_1>;
-			hsync-active = <1>;	/* Active high */
-			vsync-active = <1>;	/* Active high */
-			pclk-sample = <0>;	/* Falling */
-		};
-	};
 };
