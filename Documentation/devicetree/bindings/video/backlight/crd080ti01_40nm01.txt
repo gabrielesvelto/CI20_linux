@@ -1,0 +1,22 @@
+crd080ti01_d0nm01 bindings
+
+Required properties:
+  - compatible: "crd080ti01_40nm01-lcd"
+
+Optional properties:
+  - right-to-left: Left to right GPIO pin scan direction, 0: right to left, 1: left to right
+  - up-to-down: Up to down GPIO pin scan direction, 0: top to bottom, 1: bottom to top
+  - mode-select: Mode select GPIO pin, H: 6bit, L: 8bit
+  - standby-mode: Stadnby mode GPIO pin, normally pull high. 1: normal operation
+  - reset: Global reset GPIO pin, active low to enter reset state
+  - left-to-right-scan: Left to right GPIO pin scan direction, 0: right to left, 1: left to right. 1 is default if not specified.
+  - bottom-to-top-scan: Up to down GPIO pin scan direction, 0: top to bottom, 1: bottom to top. 1 is default if not specified.
+  - six-bit-mode: 6bit/8bit mode select, 1: 6bit, 0: 8bit. 1 is default if not specified.
+
+
+Example:
+
+	backlight@1 {
+		compatible = "crd080ti01_40nm01-lcd";
+		reset = <&gpb 22 0>;
+	};
