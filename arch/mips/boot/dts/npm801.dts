@@ -84,6 +84,24 @@
 		regulator-always-on;
 	};
 
+	lcd_enabled: fixedregulator@6 {
+		compatible = "regulator-fixed";
+		regulator-name = "vccio3v0_reg";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+		gpio = <&gpb 23 0>;
+		enable-active-high;
+	};
+
+	lcd_power: fixedregulator@7 {
+		compatible = "regulator-fixed";
+		regulator-name = "lcd_power";
+		gpio = <&gpe 0 0>;
+		regulator-boot-on;
+		enable-active-high;
+		regulator-always-on;
+	};
+
 	ir: ir-receiver {
 		compatible = "gpio-ir-receiver";
 		gpios = <&gpe 3 GPIO_ACTIVE_LOW>;
@@ -107,6 +125,9 @@
 		};
 	};
 
+	lcd_panel: backlight@1 {
+		compatible = "crd080ti01_40nm01-lcd";
+	};
 };
 
 &ext {
@@ -207,10 +228,12 @@
 				regulator-max-microvolt = <2800000>;
 			};
 
-			vcim1v5_reg: LDO_REG8 {
-				regulator-name = "vcim1v5";
-				regulator-min-microvolt = <1500000>;
-				regulator-max-microvolt = <1500000>;
+			lcd_regulator: LDO_REG8 {
+				regulator-name = "lcd3v0";
+				regulator-min-microvolt = <3000000>;
+				regulator-max-microvolt = <3000000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 
 			/* Do not disable RTC as they connect to reset line */
