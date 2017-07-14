@@ -201,8 +201,8 @@
 				regulator-max-microvolt = <3300000>;
 			};
 
-			vcim2v8_reg: LDO_REG7 {
-				regulator-name = "vcim2v8";
+			touchscreen_reg: LDO_REG7 {
+				regulator-name = "mg8698s_2v8";
 				regulator-min-microvolt = <2800000>;
 				regulator-max-microvolt = <2800000>;
 			};
@@ -231,6 +231,18 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c1_data>;
+
+	mg8698s_ts {
+		compatible = "tcs,mg8698_tcs";
+		reg = <0x44>;
+
+		wake-gpios = <&gpf 18 GPIO_ACTIVE_LOW>;
+		interrupt = <&gpf 19 GPIO_ACTIVE_LOW>;
+
+		x-size = <1344>;
+		y-size = <960>;
+	};
+
 };
 
 &i2c2 {
