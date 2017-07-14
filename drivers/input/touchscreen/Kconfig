@@ -404,6 +404,30 @@ config TOUCHSCREEN_MCS5000
 	  To compile this driver as a module, choose M here: the
 	  module will be called mcs5000_ts.
 
+config TOUCHSCREEN_MG8698S
+	tristate "MG8698S touchscreen"
+	depends on I2C
+	help
+	  mg8698s a CTP controller,support panel 7"~10.1"
+
+config  TSC_SWAP_XY
+	bool "Swap x and y "
+	depends on TOUCHSCREEN_MG8698S
+	help
+	  say Y here if you need to flip x y.
+
+config  TSC_SWAP_X
+	bool "Swap x"
+	depends on TOUCHSCREEN_MG8698S
+	help
+	  say Y here if you need to flip x.
+
+config  TSC_SWAP_Y
+	bool "Swap y "
+	depends on TOUCHSCREEN_MG8698S
+	help
+	  say Y here if you need to flip y.
+
 config TOUCHSCREEN_MMS114
 	tristate "MELFAS MMS114 touchscreen"
 	depends on I2C
