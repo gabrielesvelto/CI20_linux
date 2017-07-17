@@ -134,6 +134,14 @@
 	clock-frequency = <48000000>;
 };
 
+&lcd {
+	max-width = <1024>;
+	max-height = <768>;
+
+	clocks = <&cgu JZ4780_CLK_TVE>, <&cgu JZ4780_CLK_LCD0PIXCLK>, <&cgu JZ4780_CLK_LCD>, <&cgu JZ4780_CLK_LCD1PIXCLK>;
+	clock-names = "lcd_clk", "lcd_pixclk", "lcd1_clk", "lcd1_pixclk";
+};
+
 &msc0 {
 	bus-width = <4>;
 	max-frequency = <50000000>;
