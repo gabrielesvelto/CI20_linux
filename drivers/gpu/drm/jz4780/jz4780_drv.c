@@ -18,6 +18,7 @@
  */
 
 #include "jz4780_drv.h"
+#include "jz4780_lcd.h"
 #include "jz4780_regs.h"
 
 #include "drm_fb_helper.h"
@@ -62,8 +63,8 @@ void modeset_init(struct drm_device *dev)
 
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
-	dev->mode_config.max_width = 2048;
-	dev->mode_config.max_height = 2048;
+	dev->mode_config.max_width = priv->max_width;
+	dev->mode_config.max_height = priv->max_height;
 	dev->mode_config.async_page_flip = true;
 	dev->mode_config.funcs = &mode_config_funcs;
 }
@@ -86,6 +87,17 @@ static int jz4780_unload(struct drm_device *dev)
 
 	if (priv->clk)
 		clk_put(priv->clk);
+
+	if (priv->disp_clk)
+		clk_put(priv->disp_clk);
+
+#ifdef CONFIG_DRM_JZ4780_LCD
+	if (priv->clk1)
+		clk_put(priv->clk1);
+
+	if (priv->disp_clk1)
+		clk_put(priv->disp_clk1);
+#endif
 
 	if (priv->mmio)
 		iounmap(priv->mmio);
@@ -148,7 +160,7 @@ static int jz4780_load(struct drm_device *dev, unsigned long flags)
 	clk_prepare_enable(priv->clk);
 
 	priv->disp_clk = clk_get(dev->dev, "lcd_pixclk");
-	if (IS_ERR(priv->clk)) {
+	if (IS_ERR(priv->disp_clk)) {
 		DRM_DEBUG_DRIVER("failed to get pixel clock\n");
 		ret = -ENODEV;
 		goto fail;
@@ -162,9 +174,48 @@ static int jz4780_load(struct drm_device *dev, unsigned long flags)
 	if (of_property_read_u32(node, "max-width", &priv->max_width))
 		priv->max_width = JZ4780_DEFAULT_MAX_WIDTH;
 
+	if (of_property_read_u32(node, "max-height", &priv->max_height))
+		priv->max_height = JZ4780_DEFAULT_MAX_HEIGHT;
+
 	if (of_property_read_u32(node, "max-pixelclock",
 					&priv->max_pixelclock))
 		priv->max_pixelclock = JZ4780_DEFAULT_MAX_PIXELCLOCK;
+
+#ifdef CONFIG_DRM_JZ4780_LCD
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		DRM_DEBUG_DRIVER("failed to get memory resource\n");
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	priv->mmio1 = ioremap_nocache(res->start, resource_size(res));
+	if (!priv->mmio) {
+		DRM_DEBUG_DRIVER("failed to ioremap\n");
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	jz4780_lcd_copy_logo(priv->mmio1);
+
+	priv->clk1 = clk_get(dev->dev, "lcd1_clk");
+	if (IS_ERR(priv->clk1)) {
+		DRM_DEBUG_DRIVER("failed to get lcd1 clock\n");
+		ret = -ENODEV;
+		goto fail;
+	}
+
+	clk_prepare_enable(priv->clk1);
+
+	priv->disp_clk1 = clk_get(dev->dev, "lcd1_pixclk");
+	if (IS_ERR(priv->disp_clk1)) {
+		DRM_DEBUG_DRIVER("failed to get lcd1 pixel clock\n");
+		ret = -ENODEV;
+		goto fail;
+	}
+
+	clk_prepare_enable(priv->disp_clk1);
+#endif
 
 	drm_mode_config_init(dev);
 
@@ -174,13 +225,15 @@ static int jz4780_load(struct drm_device *dev, unsigned long flags)
 		hdmi_node = of_find_node_by_phandle(hdmi_phandle);
 		if (!hdmi_node) {
 			dev_err(&pdev->dev, "could not get hdmi node\n");
-			return -ENODEV;
+			ret = -ENODEV;
+			goto fail;
 		}
 
 		hdmi_pdev = of_find_device_by_node(hdmi_node);
 		if (!hdmi_pdev) {
 			dev_err(&pdev->dev, "hdmi platform device not found\n");
-			return -ENODEV;
+			ret = -ENODEV;
+			goto fail;
 		}
 
 		hdmi = platform_get_drvdata(hdmi_pdev);

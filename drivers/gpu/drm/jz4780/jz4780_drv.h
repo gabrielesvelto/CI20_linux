@@ -38,8 +38,8 @@
 /* Defaulting to maximum capability of JZ4780 */
 #define JZ4780_DEFAULT_MAX_PIXELCLOCK	200000
 #define JZ4780_DEFAULT_MAX_WIDTH	2048
+#define JZ4780_DEFAULT_MAX_HEIGHT	2048
 #define JZ4780_DEFAULT_MAX_BANDWIDTH	(1920*1080*60)
-
 
 struct jz4780_drm_private {
 	void __iomem *mmio;
@@ -60,6 +60,11 @@ struct jz4780_drm_private {
 	 * measured in pixels
 	 */
 	uint32_t max_width;
+	/*
+	 * Max allowable height is limited on a per device basis
+	 * measured in pixels
+	 */
+	uint32_t max_height;
 
 	struct workqueue_struct *wq;
 
@@ -72,7 +77,34 @@ struct jz4780_drm_private {
 
 	unsigned int num_connectors;
 	struct drm_connector *connectors[8];
+#ifdef CONFIG_DRM_JZ4780_LCD
+	struct clk *disp_clk1;	/* display dpll of the second LCDC */
+	struct clk *clk1;	/* functional clock of the second LCDC */
+	void __iomem *mmio1;	/* second LCD controller's mmio */
+#endif
 };
+
+/**
+ * @next: physical address of next frame descriptor
+ * @databuf: physical address of buffer
+ * @id: frame ID
+ * @cmd: DMA command and buffer length(in word)
+ * @offsize: DMA off size, in word
+ * @page_width: DMA page width, in word
+ * @cpos: smart LCD mode is commands' number, other is bpp,
+ * premulti and position of foreground 0, 1
+ * @desc_size: alpha and size of foreground 0, 1
+ */
+struct jz4780_framedesc {
+	uint32_t next;
+	uint32_t databuf;
+	uint32_t id;
+	uint32_t cmd;
+	uint32_t offsize;
+	uint32_t page_width;
+	uint32_t cpos;
+	uint32_t desc_size;
+} __packed;
 
 struct drm_crtc *jz4780_crtc_create(struct drm_device *dev);
 void jz4780_crtc_cancel_page_flip(struct drm_crtc *crtc,

@@ -18,4 +18,10 @@ config DRM_JZ4780_HDMI_AUDIO
 	select CI20_HDMI_AUDIO
 	help
 	  Choose this option to enable support for audio over HDMI
-	
+
+config DRM_JZ4780_LCD
+	bool "Support for Ingenic JZ4780 LCD"
+	depends on DRM_JZ4780
+	help
+	  Choose this option to enable LCD support
+

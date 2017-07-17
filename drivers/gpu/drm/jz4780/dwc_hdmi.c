@@ -1504,8 +1504,6 @@ static int dwc_hdmi_connector_get_modes(struct drm_connector *connector)
 static int dwc_hdmi_connector_mode_valid(struct drm_connector *connector,
 			  struct drm_display_mode *mode)
 {
-
-      unsigned int bandwidth;
       uint32_t hbp, hfp, hsw, vbp, vfp, vsw;
 
       /*

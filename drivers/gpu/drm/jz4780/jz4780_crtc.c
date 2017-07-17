@@ -22,29 +22,8 @@
 #include "drm_sync_helper.h"
 
 #include "jz4780_drv.h"
+#include "jz4780_lcd.h"
 #include "jz4780_regs.h"
-
-/**
- * @next: physical address of next frame descriptor
- * @databuf: physical address of buffer
- * @id: frame ID
- * @cmd: DMA command and buffer length(in word)
- * @offsize: DMA off size, in word
- * @page_width: DMA page width, in word
- * @cpos: smart LCD mode is commands' number, other is bpp,
- * premulti and position of foreground 0, 1
- * @desc_size: alpha and size of foreground 0, 1
- */
-struct jz4780_framedesc {
-	uint32_t next;
-	uint32_t databuf;
-	uint32_t id;
-	uint32_t cmd;
-	uint32_t offsize;
-	uint32_t page_width;
-	uint32_t cpos;
-	uint32_t desc_size;
-} __packed;
 
 struct jz4780_crtc {
 	struct drm_crtc base;
@@ -157,10 +136,18 @@ static void set_scanout(struct drm_crtc *crtc, int n)
 
 static void update_scanout(struct drm_crtc *crtc)
 {
+#ifdef CONFIG_DRM_JZ4780_LCD
+	struct jz4780_drm_private *priv = crtc->dev->dev_private;
+#endif
+
 	/* Update registers immediately */
 	jz4780_write(crtc->dev, LCDC_STATE, 0);
 	set_scanout(crtc, 0);
 	set_scanout(crtc, 1);
+#ifdef CONFIG_DRM_JZ4780_LCD
+	jz4780_lcd_fill_dmafb(to_jz4780_crtc(crtc)->framedesc, priv->mmio1);
+	jz4780_lcd_release_logo();
+#endif
 }
 
 static void start(struct drm_crtc *crtc)
@@ -251,11 +238,17 @@ static void jz4780_do_page_flip(struct drm_reservation_cb *rcb,
 	struct jz4780_crtc *jz4780_crtc = params;
 	struct drm_crtc *crtc = &jz4780_crtc->base;
 	struct drm_device *dev = crtc->dev;
+#ifdef CONFIG_DRM_JZ4780_LCD
+	struct jz4780_drm_private *priv = dev->dev_private;
+#endif
 	unsigned long flags;
 
 	if (jz4780_crtc->flip_busy) {
 		set_scanout(crtc, 0);
 		set_scanout(crtc, 1);
+#ifdef CONFIG_DRM_JZ4780_LCD
+		jz4780_lcd_fill_dmafb(jz4780_crtc->framedesc, priv->mmio1);
+#endif
 
 		spin_lock_irqsave(&dev->event_lock, flags);
 		if (jz4780_crtc->flip_busy) {

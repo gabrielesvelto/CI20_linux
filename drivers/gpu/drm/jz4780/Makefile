@@ -8,5 +8,6 @@ jz4780-y := \
 	dwc_hdmi.o \
 	jz4780_drv.o
 
-obj-$(CONFIG_DRM_JZ4780)	+= jz4780.o
-obj-$(CONFIG_DRM_JZ4780_HDMI_AUDIO) += dw-hdmi-audio.o
+obj-$(CONFIG_DRM_JZ4780)		+= jz4780.o
+obj-$(CONFIG_DRM_JZ4780_HDMI_AUDIO)	+= dw-hdmi-audio.o
+obj-$(CONFIG_DRM_JZ4780_LCD)		+= jz4780_lcd.o
