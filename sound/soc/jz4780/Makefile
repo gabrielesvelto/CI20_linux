@@ -16,3 +16,4 @@
 #
 
 obj-$(CONFIG_SND_JZ4780_SOC_CI20)	+= ci20.o
+obj-$(CONFIG_SND_JZ4780_SOC_NPM801)	+= npm801.o
