@@ -41,7 +41,7 @@
 	wifi_power: fixedregulator@1 {
 		compatible = "regulator-fixed";
 		regulator-name = "wifi_power_gpio";
-		gpio = <&gpb 19 0>;
+		gpio = <&gpd 8 0>;
 		enable-active-high;
 
 		regulator-min-microvolt = <3300000>;
