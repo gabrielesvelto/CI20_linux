@@ -132,6 +132,8 @@
 #define REG_CR_MIX_MIX_LOAD_WRITE		0x40
 #define REG_CR_MIX_DAC_MIX_MASK			0x3
 
+#define SR_JACK					5
+#define CODEC_JACK_MASK				BIT(SR_JACK)
 
 static struct reg_default jz4780_codec_reg_defaults[] = {
 	{ REG_AICR_DAC,		0xd3 },
@@ -507,6 +509,21 @@ static struct regmap_config jz4780_codec_regmap_config = {
 	.num_reg_defaults = ARRAY_SIZE(jz4780_codec_reg_defaults),
 	.cache_type = REGCACHE_NONE,
 };
+
+int jz4780_codec_check_hp_jack_status(struct snd_soc_codec *codec)
+{
+	int state;
+	struct jz4780_codec *jz4780_codec = snd_soc_codec_get_drvdata(codec);
+
+	clk_enable(jz4780_codec->clk);
+	writel((REG_SR & REG_RGADW_RGADDR_MASK) << REG_RGADW_RGADDR_SHIFT,
+		jz4780_codec->base);
+	state = readl(jz4780_codec->base + REG_RGDATA_OFF) & REG_RGADW_RGDIN_MASK;
+	clk_disable(jz4780_codec->clk);
+	state &= CODEC_JACK_MASK;
+
+	return state;
+}
 
 static int jz4780_codec_probe(struct platform_device *pdev)
 {

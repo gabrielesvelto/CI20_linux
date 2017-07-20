@@ -17,6 +17,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/init.h>
 #include <linux/io.h>
@@ -28,53 +29,68 @@
 #include <sound/soc.h>
 
 #define GPIO_HP_MUTE 109
-#define GPIO_HP_DETECT 135
 #define GPIO_MIC_SW_EN 57
+#define GPIO_SPEAKER_EN 134
 
 static struct snd_soc_jack npm801_hp_jack;
 #ifndef CONFIG_ANDROID
 static struct snd_soc_jack npm801_hdmi_jack;
 #endif
 
-static struct snd_soc_jack_pin npm801_hp_jack_pins[] = {
-	{
-		.pin = "Headphone Jack",
-		.mask = SND_JACK_HEADPHONE,
-	},
+int jz4780_codec_check_hp_jack_status(struct snd_soc_codec *codec);
+
+struct detection_thread_control {
+	struct mutex lock;
+	int hp_detection_enabled;
+	struct snd_soc_codec *codec;
 };
 
-static int npm801_hp_jack_status_check(void *data)
+struct detection_thread_control detection_thread_ctl;
+
+static void npm801_check_hp_jack_status(struct work_struct *unused)
 {
-	int enable;
+	int run;
+	int val;
 
-	enable = !gpio_get_value_cansleep(GPIO_HP_DETECT);
+	do {
+		val = !jz4780_codec_check_hp_jack_status(detection_thread_ctl.codec);
 
-	/*
-	 * The headset type detection switch requires a rising edge on its
-	 * enable pin to trigger the detection sequence.
-	 */
-	if (enable) {
-		gpio_set_value_cansleep(GPIO_MIC_SW_EN, 1);
-		return SND_JACK_HEADPHONE;
-	} else {
-		gpio_set_value_cansleep(GPIO_MIC_SW_EN, 0);
-		return 0;
-	}
+		/*
+		 * When headphones are muted, speakers are enabled
+		 * and vice versa.
+		 */
+		gpio_set_value(GPIO_HP_MUTE, val);
+		gpio_set_value(GPIO_SPEAKER_EN, val);
+		msleep(250);
+
+		mutex_lock(&detection_thread_ctl.lock);
+		run = detection_thread_ctl.hp_detection_enabled;
+		mutex_unlock(&detection_thread_ctl.lock);
+	} while (run);
 }
 
-static struct snd_soc_jack_gpio npm801_hp_jack_gpio = {
-	.name = "headphone detect",
-	.report = SND_JACK_HEADPHONE,
-	.gpio = GPIO_HP_DETECT,
-	.debounce_time = 200,
-	.invert = 1,
-	.jack_status_check = npm801_hp_jack_status_check,
-};
+static DECLARE_WORK(npm801_check_hp_jack_status_work, npm801_check_hp_jack_status);
+
 
 static int npm801_hp_event(struct snd_soc_dapm_widget *widget,
 	struct snd_kcontrol *ctrl, int event)
 {
-	gpio_set_value(GPIO_HP_MUTE, !!SND_SOC_DAPM_EVENT_OFF(event));
+	unsigned val = SND_SOC_DAPM_EVENT_ON(event);
+	if(SND_SOC_DAPM_EVENT_ON(event)) {
+		mutex_lock(&detection_thread_ctl.lock);
+		detection_thread_ctl.hp_detection_enabled = 1;
+		mutex_unlock(&detection_thread_ctl.lock);
+
+		schedule_work(&npm801_check_hp_jack_status_work);
+	} else {
+		mutex_lock(&detection_thread_ctl.lock);
+		detection_thread_ctl.hp_detection_enabled = 0;
+		mutex_unlock(&detection_thread_ctl.lock);
+
+		cancel_work_sync(&npm801_check_hp_jack_status_work);
+		gpio_set_value(GPIO_HP_MUTE, 1);
+		gpio_set_value(GPIO_SPEAKER_EN, 0);
+	}
 	return 0;
 }
 
@@ -139,11 +155,8 @@ static int npm801_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 
-	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-			&npm801_hp_jack);
-	snd_soc_jack_add_pins(&npm801_hp_jack,
-			ARRAY_SIZE(npm801_hp_jack_pins), npm801_hp_jack_pins);
-	snd_soc_jack_add_gpios(&npm801_hp_jack, 1, &npm801_hp_jack_gpio);
+	detection_thread_ctl.codec = codec;
+	mutex_init(&detection_thread_ctl.lock);
 
 	snd_soc_dapm_nc_pin(dapm, "AIP1");
 	snd_soc_dapm_nc_pin(dapm, "AIP3");
@@ -264,6 +277,13 @@ static int ingenic_asoc_npm801_probe(struct platform_device *pdev)
 
 	gpio_direction_output(GPIO_MIC_SW_EN, 0);
 
+	ret = devm_gpio_request(&pdev->dev, GPIO_SPEAKER_EN, "Speakers Enable");
+	if (ret < 0)
+		printk("Failed to request speakers enable GPIO: %d\n",
+			 ret);
+
+	gpio_direction_output(GPIO_SPEAKER_EN, 0);
+
 	ret = snd_soc_register_card(card);
 	if ((ret) && (ret != -EPROBE_DEFER))
 		dev_err(&pdev->dev, "snd_soc_register_card() failed:%d\n", ret);
@@ -276,7 +296,6 @@ static int ingenic_asoc_npm801_remove(struct platform_device *pdev)
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 
 	snd_soc_unregister_card(card);
-	snd_soc_jack_free_gpios(&npm801_hp_jack, 1, &npm801_hp_jack_gpio);
 
 	return 0;
 }
