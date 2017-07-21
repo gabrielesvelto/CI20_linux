@@ -126,11 +126,29 @@
 	gpio-keys {
 		compatible = "gpio-keys";
 
-		power {
+		back_button {
+			label = "Back Button";
+			gpios = <&gpb  5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_BACK>;
+		};
+
+		power_button {
 			label = "Power Button";
-			gpios = <&gpa  30 0>;
+			gpios = <&gpa  30 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
 			gpio-key,wakeup;
+		};
+
+		volume_down_button {
+			label = "Volume Down Button";
+			gpios = <&gpd  18 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEDOWN>;
+		};
+
+		volume_up_button {
+			label = "Volume Up Button";
+			gpios = <&gpd  17 0>;
+			linux,code = <KEY_VOLUMEUP>;
 		};
 	};
 
