@@ -123,6 +123,12 @@
 		vrfkill-supply = <&bt_reset>;
 	};
 
+	charger {
+		compatible = "ingenic,jz4780-charger";
+		gpio-ac = <&gpa 16 GPIO_ACTIVE_HIGH>;
+		gpio-charging = <&gpb 3 GPIO_ACTIVE_LOW>;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -154,6 +160,22 @@
 
 	lcd_panel: backlight@1 {
 		compatible = "crd080ti01_40nm01-lcd";
+	};
+};
+
+&adc {
+	battery: jz4780-battery@1 {
+		compatible = "ingenic,jz4780-adc,battery", "ingenic,jz4780-battery";
+		max-vol = <4080>;
+		min-vol = <3600>;
+		usb-max-vol = <4100>;
+		usb-min-vol = <3760>;
+		ac-max-vol = <4150>;
+		ac-min-vol = <3760>;
+		battery-max-cpt = <3500>;
+		ac-chg-current = <1000>;
+		usb-chg-current = <400>;
+		sleep-current = <30>;
 	};
 };
 

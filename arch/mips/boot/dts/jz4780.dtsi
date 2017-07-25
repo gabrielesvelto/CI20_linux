@@ -588,7 +588,7 @@
 			};
 		};
 
-		adc@0x10070000 {
+		adc: adc@0x10070000 {
 			compatible = "ingenic,jz4780-adc";
 			reg = <0x10070000 0x30>;
 
