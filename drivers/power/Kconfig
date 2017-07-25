@@ -254,6 +254,14 @@ config BATTERY_JZ4740
 	  This driver can be build as a module. If so, the module will be
 	  called jz4740-battery.
 
+config BATTERY_JZ4780
+	tristate "Ingenic JZ4780 battery"
+	depends on MACH_JZ4780
+	depends on MFD_JZ4740_ADC
+	help
+	  Say Y to enable support for the battery on Ingenic JZ4780 based
+	  boards.
+
 config BATTERY_INTEL_MID
 	tristate "Battery driver for Intel MID platforms"
 	depends on INTEL_SCU_IPC && SPI
