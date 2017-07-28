@@ -991,7 +991,7 @@ static int dwc_hdmi_phy_init(struct dwc_hdmi *hdmi)
 
 	/*check csc whether needed activated in HDMI mode */
 	cscon = (is_color_space_conversion(hdmi) &&
-			!hdmi->hdmi_data.video_mode.mdvi);
+			hdmi->sink_is_hdmi);
 
 	/* HDMI Phy spec says to do the phy initialization sequence twice */
 	for (i = 0; i < 2; i++) {
@@ -1172,9 +1172,9 @@ static void hdmi_av_composer(struct dwc_hdmi *hdmi,
 		HDMI_FC_INVIDCONF_IN_I_P_INTERLACED :
 		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE);
 
-	inv_val |= (vmode->mdvi ?
-		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE :
-		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE);
+	inv_val |= hdmi->sink_is_hdmi ?
+		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE :
+		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE;
 
 	hdmi_writeb(hdmi, inv_val, HDMI_FC_INVIDCONF);
 
@@ -1305,10 +1305,8 @@ static int dwc_hdmi_setup(struct dwc_hdmi *hdmi, struct drm_display_mode *mode)
 
 	if (!hdmi->vic) {
 		dev_dbg(hdmi->dev, "Non-CEA mode used in HDMI\n");
-		hdmi->hdmi_data.video_mode.mdvi = true;
 	} else {
 		dev_dbg(hdmi->dev, "CEA mode used vic=%d\n", hdmi->vic);
-		hdmi->hdmi_data.video_mode.mdvi = false;
 	}
 
 	if ((hdmi->vic == 6) || (hdmi->vic == 7) ||
@@ -1354,18 +1352,22 @@ static int dwc_hdmi_setup(struct dwc_hdmi *hdmi, struct drm_display_mode *mode)
 	/* HDMI Initialization Step B.3 */
 	dwc_hdmi_enable_video_path(hdmi);
 
-	/* not for DVI mode */
-	if (hdmi->hdmi_data.video_mode.mdvi)
-		dev_dbg(hdmi->dev, "%s DVI mode\n", __func__);
-	else {
-		dev_dbg(hdmi->dev, "%s CEA mode\n", __func__);
+	if (hdmi->sink_has_audio) {
+		dev_dbg(hdmi->dev, "sink has audio support\n");
 
 		/* HDMI Initialization Step E - Configure audio */
 		hdmi_clk_regenerator_update_pixel_clock(hdmi);
 		hdmi_enable_audio_clk(hdmi);
+	}
+
+	/* not for DVI mode */
+	if (hdmi->sink_is_hdmi) {
+		dev_dbg(hdmi->dev, "%s HDMI mode\n", __func__);
 
 		/* HDMI Initialization Step F - Configure AVI InfoFrame */
 		hdmi_config_AVI(hdmi);
+	} else {
+		dev_dbg(hdmi->dev, "%s DVI mode\n", __func__);
 	}
 
 	hdmi_video_packetize(hdmi);
@@ -1374,7 +1376,7 @@ static int dwc_hdmi_setup(struct dwc_hdmi *hdmi, struct drm_display_mode *mode)
 	hdmi_tx_hdcp_config(hdmi);
 
 	dwc_hdmi_clear_overflow(hdmi);
-	if (hdmi->cable_plugin && !hdmi->hdmi_data.video_mode.mdvi)
+	if (hdmi->cable_plugin && hdmi->sink_is_hdmi)
 		hdmi_enable_overflow_interrupts(hdmi);
 
 	return 0;
@@ -1491,6 +1493,8 @@ static int dwc_hdmi_connector_get_modes(struct drm_connector *connector)
 		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
 			edid->width_cm, edid->height_cm);
 
+		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
 		drm_mode_connector_update_edid_property(connector, edid);
 		ret = drm_add_edid_modes(connector, edid);
 		kfree(edid);
