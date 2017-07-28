@@ -212,7 +212,9 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
 		case 25200000:
 		case 27000000:
 		case 54000000:
+		case 65000000:
 		case 74250000:
+		case 78800000:
 		case 148500000:
 			cts = pixel_clk / 1000;
 			break;
