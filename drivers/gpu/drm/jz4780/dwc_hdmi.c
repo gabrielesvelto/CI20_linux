@@ -1509,19 +1509,21 @@ static int dwc_hdmi_connector_mode_valid(struct drm_connector *connector,
 			  struct drm_display_mode *mode)
 {
       uint32_t hbp, hfp, hsw, vbp, vfp, vsw;
+      struct dwc_hdmi *hdmi = container_of(connector, struct dwc_hdmi,
+			connector);
 
       /*
 	* check to see if the width is within the range that
 	* the LCD Controller physically supports
 	*/
-      if (mode->hdisplay > 2048)
+      if (mode->hdisplay > hdmi->max_width)
 	      return MODE_VIRTUAL_X;
 
       /* width must be multiple of 16 */
       if (mode->hdisplay & 0xf)
 		return MODE_VIRTUAL_X;
 
-      if (mode->vdisplay > 2048)
+      if (mode->vdisplay > hdmi->max_height)
 	      return MODE_VIRTUAL_Y;
 
       DRM_DEBUG_DRIVER("Processing mode %dx%d@%d with pixel clock %d",

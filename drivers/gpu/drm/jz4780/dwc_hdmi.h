@@ -101,6 +101,8 @@ struct dwc_hdmi {
 	unsigned int sample_rate;
 	int ratio;
 
+	uint32_t max_width;
+	uint32_t max_height;
 };
 
 void dwc_hdmi_register(struct dwc_hdmi *hdmi, struct drm_device *dev);

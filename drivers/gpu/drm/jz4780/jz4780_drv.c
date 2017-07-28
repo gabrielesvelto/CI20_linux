@@ -241,6 +241,8 @@ static int jz4780_load(struct drm_device *dev, unsigned long flags)
 
 		hdmi = platform_get_drvdata(hdmi_pdev);
 		hdmi->drm = dev;
+		hdmi->max_height = priv->max_height;
+		hdmi->max_width = priv->max_width;
 
 		dwc_hdmi_register(hdmi, dev);
 		priv->encoders[priv->num_encoders++] = &hdmi->encoder;

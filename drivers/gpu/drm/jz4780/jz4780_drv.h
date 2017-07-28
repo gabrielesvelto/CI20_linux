@@ -113,7 +113,6 @@ irqreturn_t jz4780_crtc_irq(struct drm_crtc *crtc);
 void jz4780_crtc_update_clk(struct drm_crtc *crtc);
 int jz4780_crtc_mode_valid(struct drm_crtc *crtc,
 			   struct drm_display_mode *mode);
-int jz4780_crtc_max_width(struct drm_crtc *crtc);
 struct reservation_object *jz4780_drv_lookup_resobj(struct drm_gem_object *obj);
 
 #endif /* __jz4780_DRV_H__ */
