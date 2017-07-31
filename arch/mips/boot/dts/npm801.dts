@@ -170,6 +170,10 @@
 	vmmc-supply = <&wifi_power>;
 };
 
+&ehci {
+	ingenic,vbus-gpio = <&gpf 15 0>;
+};
+
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_uart0_data>;
