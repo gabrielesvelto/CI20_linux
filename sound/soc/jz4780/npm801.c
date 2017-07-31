@@ -33,8 +33,10 @@
 #define GPIO_SPEAKER_EN 134
 
 static struct snd_soc_jack npm801_hp_jack;
-#ifndef CONFIG_ANDROID
+#ifdef CONFIG_DRM_JZ4780_HDMI_AUDIO
 static struct snd_soc_jack npm801_hdmi_jack;
+int dw_hdmi_jack_detect(struct snd_soc_codec *codec_dai,
+			struct snd_soc_jack *jack);
 #endif
 
 int jz4780_codec_check_hp_jack_status(struct snd_soc_codec *codec);
@@ -172,14 +174,10 @@ static int npm801_hdmi_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 
 	snd_soc_dapm_enable_pin(dapm, "HDMI");
-
-#ifndef CONFIG_ANDROID
-	/* Enable headphone jack detection */
+#ifdef CONFIG_DRM_JZ4780_HDMI_AUDIO
 	snd_soc_jack_new(codec, "HDMI Jack", SND_JACK_LINEOUT,
 			 &npm801_hdmi_jack);
-
-	/* Jack is connected (it just is) */
-	snd_soc_jack_report(&npm801_hdmi_jack, SND_JACK_LINEOUT, SND_JACK_LINEOUT);
+	dw_hdmi_jack_detect(codec, &npm801_hdmi_jack);
 #endif
 	return 0;
 }
