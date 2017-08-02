@@ -68,9 +68,8 @@ struct dwc_hdmi_audio_data {
 
 struct dwc_hdmi {
 	struct drm_connector connector;
-	struct dwc_drm_connector *dwc_drm_connector;
 	struct drm_encoder encoder;
-	struct dwc_drm_encoder *dwc_drm_encoder;
+	bool connector_registered;
 
 	struct drm_device *drm;
 
@@ -85,6 +84,8 @@ struct dwc_hdmi {
 
 	u8 edid[HDMI_EDID_LEN];
 	bool cable_plugin;
+	struct work_struct plugin_work;
+	struct workqueue_struct *wq;
 
 	bool phy_enabled;
 	struct drm_display_mode previous_mode;

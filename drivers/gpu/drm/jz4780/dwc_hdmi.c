@@ -1694,6 +1694,7 @@ void dwc_hdmi_register(struct dwc_hdmi *hdmi, struct drm_device *dev)
 
 	drm_mode_connector_attach_encoder(connector, encoder);
 
+	hdmi->connector_registered = 1;
 }
 EXPORT_SYMBOL_GPL(dwc_hdmi_register);
 
@@ -1716,7 +1717,7 @@ static irqreturn_t dwc_hdmi_irq(int irq, void *dev_id)
 			val &= ~HDMI_PHY_HPD;
 			hdmi_writeb(hdmi, val, HDMI_PHY_POL0);
 
-			dwc_hdmi_poweron(hdmi);
+			queue_work(hdmi->wq, &hdmi->plugin_work);
 		} else {
 			dev_dbg(hdmi->dev, "EVENT=plugout\n");
 
@@ -1731,6 +1732,20 @@ static irqreturn_t dwc_hdmi_irq(int irq, void *dev_id)
 	hdmi_writeb(hdmi, intr_stat, HDMI_IH_PHY_STAT0);
 
 	return IRQ_HANDLED;
+}
+
+static void plugin_work(struct work_struct *work)
+{
+	struct dwc_hdmi *hdmi =
+		container_of(work, struct dwc_hdmi, plugin_work);
+
+	if(hdmi->connector_registered) {
+		mutex_lock(&hdmi->connector.dev->mode_config.mutex);
+		dwc_hdmi_connector_get_modes(&hdmi->connector);
+		mutex_unlock(&hdmi->connector.dev->mode_config.mutex);
+	}
+
+	dwc_hdmi_poweron(hdmi);
 }
 
 static struct platform_device_id dwc_hdmi_devtype[] = {
@@ -1816,11 +1831,18 @@ static int dwc_hdmi_platform_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	INIT_WORK(&hdmi->plugin_work, plugin_work);
+	hdmi->wq = create_singlethread_workqueue("dwc_hdmi");
+	if(!hdmi->wq) {
+		dev_err(hdmi->dev, "Failed to allocate HDMI work queue");
+		return -ENOMEM;
+	}
+
 	ret = clk_prepare_enable(hdmi->isfr_clk);
 	if (ret) {
 		dev_err(hdmi->dev,
 			"Cannot enable HDMI sfr clock: %d\n", ret);
-		return ret;
+		goto err_wq;
 	}
 
 	if (!of_property_read_u32(np, "clock-frequency", &clk_rate))
@@ -1890,13 +1912,15 @@ static int dwc_hdmi_platform_probe(struct platform_device *pdev)
 	pdevinfo.size_data = sizeof(audio);
 	pdevinfo.dma_mask = DMA_BIT_MASK(32);
 	hdmi->audio_pdev = platform_device_register_full(&pdevinfo);
-	
+
 	return 0;
 
 err_iahb:
 	clk_disable_unprepare(hdmi->iahb_clk);
 err_isfr:
 	clk_disable_unprepare(hdmi->isfr_clk);
+err_wq:
+	destroy_workqueue(hdmi->wq);
 
 	return ret;
 }
@@ -1905,6 +1929,7 @@ static int dwc_hdmi_platform_remove(struct platform_device *pdev)
 {
 	struct dwc_hdmi *hdmi = platform_get_drvdata(pdev);
 
+	hdmi->connector_registered = 0;
 	drm_connector_unregister(&hdmi->connector);
 	drm_connector_cleanup(&hdmi->connector);
 	drm_encoder_cleanup(&hdmi->encoder);
@@ -1912,6 +1937,7 @@ static int dwc_hdmi_platform_remove(struct platform_device *pdev)
 	clk_disable_unprepare(hdmi->iahb_clk);
 	clk_disable_unprepare(hdmi->isfr_clk);
 	i2c_put_adapter(hdmi->ddc);
+	destroy_workqueue(hdmi->wq);
 
 	return 0;
 }
