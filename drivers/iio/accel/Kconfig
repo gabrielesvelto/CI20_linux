@@ -92,6 +92,13 @@ config MMA8452
 	  To compile this driver as a module, choose M here: the module
 	  will be called mma8452.
 
+config JZ4780_MMA8452
+		tristate "Ingnic JZ4780 MMA8452Q Accelerometer driver"
+		depends on I2C
+		help
+		  Say yes here to build Ingenic support for the Freescale MMA8452Q
+		  3-Axis Orientation/Motion Detection Sensor driver.
+
 config KXCJK1013
 	tristate "Kionix 3-Axis Accelerometer Driver"
 	depends on I2C
