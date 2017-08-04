@@ -102,6 +102,15 @@
 		regulator-always-on;
 	};
 
+	mma8452_power: fixedregulator@8 {
+		compatible = "regulator-fixed";
+		regulator-name = "mma8452_power";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+		gpio = <&gpe 9 0>;
+		enable-active-high;
+	};
+
 	ir: ir-receiver {
 		compatible = "gpio-ir-receiver";
 		gpios = <&gpe 3 GPIO_ACTIVE_LOW>;
@@ -286,6 +295,27 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c3_data>;
+
+	accelerometer: mma8452@1c {
+		compatible = "ingenic,mma8452";
+		reg = <0x1c>;
+
+		gpio-int = <&gpf 9 0>;
+		poll-interval = <100>;
+		min-interval = <40>;
+		max-interval = <200>;
+		g-range = /bits/ 8 <0>;
+		axis-map-x = /bits/ 8 <0>;
+		axis-map-y = /bits/ 8 <1>;
+		axis-map-z = /bits/ 8 <2>;
+		negate-x = /bits/ 8 <1>;
+		negate-y = /bits/ 8 <1>;
+		negate-z = /bits/ 8 <1>;
+
+		ori-pr_swap = /bits/ 8 <0>;
+		ori-pith_negate = /bits/ 8 <0>;
+		ori-roll_negate = /bits/ 8 <1>;
+	};
 };
 
 &i2c4 {
