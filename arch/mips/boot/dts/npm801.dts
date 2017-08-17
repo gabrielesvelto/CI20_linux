@@ -111,6 +111,15 @@
 		enable-active-high;
 	};
 
+	camera_power: fixedregulator@9 {
+		compatible = "regulator-fixed";
+		regulator-name = "camera_power";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&gpb 27 0>;
+		enable-active-high;
+	};
+
 	ir: ir-receiver {
 		compatible = "gpio-ir-receiver";
 		gpios = <&gpe 3 GPIO_ACTIVE_LOW>;
@@ -333,6 +342,41 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c2_data>;
+
+	ov7675@0x21 {
+		compatible = "omnivision,ov7675";
+		reg = <0x21>;
+
+		core-supply = <&camera_power>;
+
+		gpio-enable = <&gpb 18 0>;
+
+		remote = <&cim>;
+		port {
+			ov7675_1: endpoint {
+				bus-width = <8>;
+				remote-endpoint = <&enp0>;
+			};
+		};
+	};
+
+	ov2650@0x30 {
+		compatible = "omnivision,ov2650";
+		reg = <0x30>;
+
+		core-supply = <&camera_power>;
+
+		gpio-enable = <&gpb 19 0>;
+		gpio-reset = <&gpb 26 0>;
+
+		remote = <&cim>;
+		port {
+			ov2650_1: endpoint {
+				bus-width = <8>;
+				remote-endpoint = <&enp1>;
+			};
+		};
+	};
 };
 
 &i2c3 {
@@ -366,4 +410,35 @@
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_i2c4_data_pf>;
+};
+
+&cim {
+	clock-frequency = <24000000>;
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			enp0: endpoint {
+				remote-endpoint = <&ov7675_1>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+				pclk-sample = <0>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			enp1: endpoint {
+				remote-endpoint = <&ov2650_1>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+				pclk-sample = <0>;
+			};
+		};
+	};
 };
