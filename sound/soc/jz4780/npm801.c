@@ -101,7 +101,7 @@ static const struct snd_soc_dapm_widget npm801_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route npm801_routes[] = {
-	{"Mic", NULL, "AIP2"},
+	{"Mic", NULL, "AIP1"},
 	{"Headphone Jack", NULL, "AOHPL"},
 	{"Headphone Jack", NULL, "AOHPR"},
 	{"HDMI", NULL, "TX"},
@@ -158,7 +158,7 @@ static int npm801_init(struct snd_soc_pcm_runtime *rtd)
 	detection_thread_ctl.codec = codec;
 	mutex_init(&detection_thread_ctl.lock);
 
-	snd_soc_dapm_nc_pin(dapm, "AIP1");
+	snd_soc_dapm_nc_pin(dapm, "AIP2");
 	snd_soc_dapm_nc_pin(dapm, "AIP3");
 	snd_soc_dapm_force_enable_pin(dapm, "Mic Bias");
 	snd_soc_dapm_sync(dapm);
@@ -275,7 +275,7 @@ static int ingenic_asoc_npm801_probe(struct platform_device *pdev)
 			 "Failed to request mic switch enable GPIO: %d\n",
 			 ret);
 
-	gpio_direction_output(GPIO_MIC_SW_EN, 0);
+	gpio_direction_output(GPIO_MIC_SW_EN, 1);
 
 	ret = devm_gpio_request(&pdev->dev, GPIO_SPEAKER_EN, "Speakers Enable");
 	if (ret < 0)
