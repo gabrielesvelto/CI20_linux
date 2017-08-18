@@ -30,12 +30,11 @@
 #include <linux/fs.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
+#include <linux/jz_efuse.h>
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/delay.h>
-
-#include "jz_efuse.h"
 
 static int jz_init_efuse_cfginfo(struct jz_efuse *efuse, unsigned long clk_rate)
 {
