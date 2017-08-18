@@ -91,16 +91,19 @@ static int jz4780_unload(struct drm_device *dev)
 	if (priv->disp_clk)
 		clk_put(priv->disp_clk);
 
+	if (priv->mmio)
+		iounmap(priv->mmio);
+
 #ifdef CONFIG_DRM_JZ4780_LCD
 	if (priv->clk1)
 		clk_put(priv->clk1);
 
 	if (priv->disp_clk1)
 		clk_put(priv->disp_clk1);
-#endif
 
-	if (priv->mmio)
-		iounmap(priv->mmio);
+	if (priv->mmio1)
+		iounmap(priv->mmio1);
+#endif
 
 	flush_workqueue(priv->wq);
 	destroy_workqueue(priv->wq);
