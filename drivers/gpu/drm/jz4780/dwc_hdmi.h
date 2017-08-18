@@ -14,7 +14,6 @@
 
 
 struct hdmi_vmode {
-	bool mdvi;
 	bool mhsyncpolarity;
 	bool mvsyncpolarity;
 	bool minterlaced;
@@ -94,6 +93,8 @@ struct dwc_hdmi {
 	struct i2c_adapter *ddc;
 	void __iomem *regs;
 	int reg_shift;
+	bool sink_is_hdmi;
+	bool sink_has_audio;
 
 	unsigned long pixel_clk_rate;
 	unsigned int sample_rate;
