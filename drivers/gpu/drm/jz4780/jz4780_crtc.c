@@ -478,11 +478,6 @@ static const struct drm_crtc_helper_funcs jz4780_crtc_helper_funcs = {
 		.mode_set       = jz4780_crtc_mode_set,
 };
 
-int jz4780_crtc_max_width(struct drm_crtc *crtc)
-{
-	return 2048;
-}
-
 int jz4780_crtc_mode_valid(struct drm_crtc *crtc, struct drm_display_mode *mode)
 {
 	struct jz4780_drm_private *priv = crtc->dev->dev_private;
@@ -493,14 +488,14 @@ int jz4780_crtc_mode_valid(struct drm_crtc *crtc, struct drm_display_mode *mode)
 	 * check to see if the width is within the range that
 	 * the LCD Controller physically supports
 	 */
-	if (mode->hdisplay > 2048)
+	if (mode->hdisplay > priv->max_width)
 		return MODE_VIRTUAL_X;
 
 	/* width must be multiple of 16 */
 	if (mode->hdisplay & 0xf)
 		return MODE_VIRTUAL_X;
 
-	if (mode->vdisplay > 2048)
+	if (mode->vdisplay > priv->max_height)
 		return MODE_VIRTUAL_Y;
 
 	DRM_DEBUG_DRIVER("Processing mode %dx%d@%d with pixel clock %d",
