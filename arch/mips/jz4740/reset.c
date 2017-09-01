@@ -96,6 +96,7 @@ static void jz4740_restart(char *command)
 #define JZ_REG_RTC_HIBERNATE		0x20
 #define JZ_REG_RTC_WAKEUP_FILTER	0x24
 #define JZ_REG_RTC_RESET_COUNTER	0x28
+#define JZ_REG_RTC_HWRSR		0x30
 #define JZ_REG_RTC_WENR			0x3C
 
 #define JZ_RTC_CTRL_WRDY		BIT(7)
@@ -166,6 +167,9 @@ static void jz4740_power_off(void)
 		reset_counter_ticks = JZ_RTC_RESET_COUNTER_MASK;
 	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_RESET_COUNTER,
 			     reset_counter_ticks);
+
+	/* Clear wake up status register */
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_HWRSR, 0x0);
 
 	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_HIBERNATE, 1);
 
