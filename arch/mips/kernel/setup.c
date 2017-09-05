@@ -299,6 +299,7 @@ static void __init bootmem_init(void)
 	unsigned long reserved_end;
 	unsigned long mapstart = ~0UL;
 	unsigned long bootmap_size;
+	phys_addr_t ramstart = ~0UL;
 	int i;
 
 	/*
@@ -316,6 +317,20 @@ static void __init bootmem_init(void)
 	 */
 	min_low_pfn = ~0UL;
 	max_low_pfn = 0;
+
+	/*
+	 * Reserve any memory between the start of RAM and PHYS_OFFSET
+	 */
+	for (i = 0; i < boot_mem_map.nr_map; i++) {
+		if (boot_mem_map.map[i].type != BOOT_MEM_RAM)
+			continue;
+
+		ramstart = min(ramstart, (phys_addr_t)(boot_mem_map.map[i].addr));
+	}
+
+	if (ramstart > PHYS_OFFSET)
+		add_memory_region(PHYS_OFFSET, ramstart - PHYS_OFFSET,
+				  BOOT_MEM_RESERVED);
 
 	/*
 	 * Find the highest page frame number we have available.
