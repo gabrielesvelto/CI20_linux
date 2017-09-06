@@ -154,6 +154,10 @@ static void start(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
 	uint32_t ctrl;
+#if CONFIG_DRM_JZ4780_LCD
+	struct jz4780_drm_private *priv = dev->dev_private;
+	jz4780_lcd_start(priv->mmio1);
+#endif
 
 	jz4780_write(dev, LCDC_STATE, 0);
 	jz4780_write(dev, LCDC_OSDS, 0);
@@ -169,6 +173,10 @@ static void stop(struct drm_crtc *crtc)
 	struct drm_device *dev = crtc->dev;
 	int count = 5;
 	uint32_t ctrl;
+#if CONFIG_DRM_JZ4780_LCD
+	struct jz4780_drm_private *priv = dev->dev_private;
+	jz4780_lcd_stop(priv->mmio1);
+#endif
 
 	ctrl = jz4780_read(dev, LCDC_CTRL);
 	ctrl |= LCDC_CTRL_DIS;
