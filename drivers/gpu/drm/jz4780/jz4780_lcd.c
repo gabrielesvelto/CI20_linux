@@ -24,27 +24,45 @@
 void *logo_buffer = 0;
 struct jz4780_framedesc *fdsc1, *fdsc2;
 
-static inline void jz4780_lcd_disable(void __iomem *base)
+void jz4780_lcd_start(void __iomem *base)
 {
-	unsigned ctrl = ioread32(base + LCDC_CTRL);
-	ctrl |= LCDC_CTRL_DIS;
-	iowrite32(ctrl, base + LCDC_CTRL);
-}
+	uint32_t ctrl;
 
-static inline void jz4780_lcd_enable(void __iomem *base)
-{
-	unsigned ctrl = ioread32(base + LCDC_CTRL);
+	iowrite32(0, base + LCDC_STATE);
+	iowrite32(0, base + LCDC_OSDS);
+	ctrl = ioread32(base + LCDC_CTRL);
 	ctrl |= LCDC_CTRL_ENA;
 	ctrl &= ~LCDC_CTRL_DIS;
 	iowrite32(ctrl, base + LCDC_CTRL);
+
 }
 
-static inline void  jz4780_lcd_update_dma(void __iomem *base)
+void jz4780_lcd_stop(void __iomem *base)
 {
-	jz4780_lcd_disable(base);
+	int count = 5;
+	uint32_t ctrl;
+
+	ctrl = ioread32(base + LCDC_CTRL);
+	ctrl |= LCDC_CTRL_DIS;
+	iowrite32(ctrl, base + LCDC_CTRL);
+	while (!(ioread32(base + LCDC_STATE) & LCDC_STATE_LDD)
+	       && count--) {
+		usleep_range(1000, 2000);
+	}
+	if (count >= 0) {
+		ctrl = ioread32(base + LCDC_STATE);
+		ctrl &= ~LCDC_STATE_LDD;
+		iowrite32(ctrl, base + LCDC_STATE);
+	} else {
+		DRM_DEBUG_DRIVER("LCDC normal disable state wrong");
+	}
+
+}
+
+static inline void jz4780_lcd_update_dma(void __iomem *base)
+{
 	iowrite32(fdsc2->next, base + LCDC_DA0);
 	iowrite32(fdsc1->next, base + LCDC_DA1);
-	jz4780_lcd_enable(base);
 }
 
 void jz4780_lcd_fill_dmafb(struct jz4780_framedesc *framedesc, void __iomem *base)

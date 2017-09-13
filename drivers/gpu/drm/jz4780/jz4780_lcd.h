@@ -40,6 +40,8 @@ void jz4780_lcd_fill_dmafb(struct jz4780_framedesc *framedesc, void __iomem *bas
  *
  */
 void jz4780_lcd_copy_logo(void __iomem *base);
+void jz4780_lcd_start(void __iomem *base);
+void jz4780_lcd_stop(void __iomem *base);
 
 /*
  * jz4780_lcd_release_log frees the memory used for storing logo.
