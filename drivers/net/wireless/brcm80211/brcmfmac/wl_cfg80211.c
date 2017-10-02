@@ -2216,7 +2216,7 @@ static void brcmf_convert_sta_flags(u32 fw_sta_flags, struct station_info *si)
    struct nl80211_sta_flag_update *sfu;
 
    brcmf_dbg(TRACE, "flags %08x\n", fw_sta_flags);
-   si->filled |= BIT(NL80211_STA_INFO_STA_FLAGS);
+   si->filled |= STATION_INFO_STA_FLAGS;
    sfu = &si->sta_flags;
    sfu->mask = BIT(NL80211_STA_FLAG_WME) |
            BIT(NL80211_STA_FLAG_AUTHENTICATED) |
@@ -2252,7 +2252,7 @@ static void brcmf_fill_bss_param(struct brcmf_if *ifp, struct station_info *si)
         brcmf_err("Failed to get bss info (%d)\n", err);
         goto out_kfree;
     }
-    si->filled |= BIT(NL80211_STA_INFO_BSS_PARAM);
+    si->filled |= STATION_INFO_BSS_PARAM;
     si->bss_param.beacon_interval = le16_to_cpu(buf->bss_le.beacon_period);
     si->bss_param.dtim_period = buf->bss_le.dtim_period;
     capability = le16_to_cpu(buf->bss_le.capability);
@@ -2297,7 +2297,7 @@ brcmf_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev,
 		}
 	}
 	brcmf_dbg(TRACE, "version %d\n", le16_to_cpu(sta_info_le.ver));
-	sinfo->filled = BIT(NL80211_STA_INFO_INACTIVE_TIME);
+	sinfo->filled = STATION_INFO_INACTIVE_TIME;
 	sinfo->inactive_time = le32_to_cpu(sta_info_le.idle) * 1000;
 	sta_flags = le32_to_cpu(sta_info_le.flags);
 	brcmf_convert_sta_flags(sta_flags, sinfo);
@@ -2307,17 +2307,17 @@ brcmf_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev,
 	else
 	    sinfo->sta_flags.set &= ~BIT(NL80211_STA_FLAG_TDLS_PEER);
 	if (sta_flags & BRCMF_STA_ASSOC) {
-	    sinfo->filled |= BIT(NL80211_STA_INFO_CONNECTED_TIME);
+	    sinfo->filled |= STATION_INFO_CONNECTED_TIME;
 	    sinfo->connected_time = le32_to_cpu(sta_info_le.in);
 	    brcmf_fill_bss_param(ifp, sinfo);
 	}
 	if (sta_flags & BRCMF_STA_SCBSTATS) {
-	    sinfo->filled |= BIT(NL80211_STA_INFO_TX_FAILED);
+	    sinfo->filled |= STATION_INFO_TX_FAILED;
 	    sinfo->tx_failed = le32_to_cpu(sta_info_le.tx_failures);
-	    sinfo->filled |= BIT(NL80211_STA_INFO_TX_PACKETS);
+	    sinfo->filled |= STATION_INFO_TX_PACKETS;
 	    sinfo->tx_packets = le32_to_cpu(sta_info_le.tx_pkts);
 	    sinfo->tx_packets += le32_to_cpu(sta_info_le.tx_mcast_pkts);
-	    sinfo->filled |= BIT(NL80211_STA_INFO_RX_PACKETS);
+	    sinfo->filled |= STATION_INFO_RX_PACKETS;
 	    sinfo->rx_packets = le32_to_cpu(sta_info_le.rx_ucast_pkts);
 	    sinfo->rx_packets += le32_to_cpu(sta_info_le.rx_mcast_pkts);
 	    if (sinfo->tx_packets) {
@@ -2327,14 +2327,14 @@ brcmf_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev,
 		}
 
 		if (sinfo->rx_packets) {
-		   sinfo->filled |= BIT(NL80211_STA_INFO_RX_BITRATE);
+		   sinfo->filled |= STATION_INFO_RX_BITRATE;
 		   sinfo->rxrate.legacy = le32_to_cpu(sta_info_le.rx_rate);
 		   sinfo->rxrate.legacy /= 100;
 		}
 		if (le16_to_cpu(sta_info_le.ver) >= 4) {
-		    sinfo->filled |= BIT(NL80211_STA_INFO_TX_BYTES);
+		    sinfo->filled |= STATION_INFO_TX_BYTES;
 		    sinfo->tx_bytes = le64_to_cpu(sta_info_le.tx_tot_bytes);
-		    sinfo->filled |= BIT(NL80211_STA_INFO_RX_BYTES);
+		    sinfo->filled |= STATION_INFO_RX_BYTES;
 		    sinfo->rx_bytes = le64_to_cpu(sta_info_le.rx_tot_bytes);
 		}
 	}
