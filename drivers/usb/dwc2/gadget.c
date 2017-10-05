@@ -2446,6 +2446,34 @@ irq_retry:
 
 	gintsts &= gintmsk;
 
+	if (gintsts & GINTSTS_USBRST) {
+
+		u32 usb_status = readl(hsotg->regs + GOTGCTL);
+
+		dev_dbg(hsotg->dev, "%s: USBRst\n", __func__);
+		dev_dbg(hsotg->dev, "GNPTXSTS=%08x\n",
+			readl(hsotg->regs + GNPTXSTS));
+
+		writel(GINTSTS_USBRST, hsotg->regs + GINTSTS);
+
+		/* Report disconnection if it is not already done. */
+		s3c_hsotg_disconnect(hsotg);
+
+		/* Reset device address to zero */
+		__bic32(hsotg->regs + DCFG, DCFG_DEVADDR_MASK);
+
+		if (usb_status & GOTGCTL_BSESVLD) {
+			if (time_after(jiffies, hsotg->last_rst +
+				       msecs_to_jiffies(200))) {
+
+				kill_all_requests(hsotg, hsotg->eps_out[0],
+							  -ECONNRESET);
+
+				s3c_hsotg_core_init_disconnected(hsotg, true);
+			}
+		}
+	}
+
 	if (gintsts & GINTSTS_ENUMDONE) {
 		writel(GINTSTS_ENUMDONE, hsotg->regs + GINTSTS);
 
@@ -2474,34 +2502,6 @@ irq_retry:
 						ep++, daint_in >>= 1) {
 			if (daint_in & 1)
 				s3c_hsotg_epint(hsotg, ep, 1);
-		}
-	}
-
-	if (gintsts & GINTSTS_USBRST) {
-
-		u32 usb_status = readl(hsotg->regs + GOTGCTL);
-
-		dev_dbg(hsotg->dev, "%s: USBRst\n", __func__);
-		dev_dbg(hsotg->dev, "GNPTXSTS=%08x\n",
-			readl(hsotg->regs + GNPTXSTS));
-
-		writel(GINTSTS_USBRST, hsotg->regs + GINTSTS);
-
-		/* Report disconnection if it is not already done. */
-		s3c_hsotg_disconnect(hsotg);
-
-		/* Reset device address to zero */
-		__bic32(hsotg->regs + DCFG, DCFG_DEVADDR_MASK);
-
-		if (usb_status & GOTGCTL_BSESVLD) {
-			if (time_after(jiffies, hsotg->last_rst +
-				       msecs_to_jiffies(200))) {
-
-				kill_all_requests(hsotg, hsotg->eps_out[0],
-							  -ECONNRESET);
-
-				s3c_hsotg_core_init_disconnected(hsotg, true);
-			}
 		}
 	}
 
