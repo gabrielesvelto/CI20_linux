@@ -32,6 +32,14 @@
 
 #define JZ4740_EMC_SDRAM_CTRL 0x80
 
+unsigned long dtb_addr;
+
+static int __init early_parse_dtbaddr(char *p)
+{
+	dtb_addr = memparse(p, &p);
+	return 0;
+}
+early_param("dtb_addr", early_parse_dtbaddr);
 
 static void __init jz4740_detect_mem(void)
 {
@@ -72,8 +80,16 @@ void __init plat_mem_setup(void)
 
 void __init device_tree_init(void)
 {
-	if (!initial_boot_params)
-		return;
+	void *fdt = (void *) dtb_addr;
+
+	if (!dtb_addr || fdt_check_header(fdt)) {
+		if (!initial_boot_params)
+			return;
+		printk("Using integrated dtb\n");
+	} else {
+		printk("Using dtb at address %lx\n", dtb_addr);
+		initial_boot_params = fdt;
+	}
 
 	unflatten_and_copy_device_tree();
 }
