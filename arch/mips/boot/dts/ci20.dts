@@ -134,6 +134,7 @@
 		};
 	};
 
+	fw: firmware {};
 };
 
 &ext {
