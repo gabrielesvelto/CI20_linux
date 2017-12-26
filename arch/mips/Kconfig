@@ -276,6 +276,7 @@ config MACH_JZ4780
 	select SYS_SUPPORTS_SMP
 	select MIPS_EXECUTE_ARM
 	select HAVE_ARCH_HARDENED_USERCOPY
+	select SYS_SUPPORTS_HOTPLUG_CPU
 
 config LANTIQ
 	bool "Lantiq based platforms"
