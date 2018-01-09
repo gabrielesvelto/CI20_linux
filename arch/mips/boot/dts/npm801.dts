@@ -170,6 +170,8 @@
 	lcd_panel: backlight@1 {
 		compatible = "crd080ti01_40nm01-lcd";
 	};
+
+	fw: firmware {};
 };
 
 &adc {
