@@ -65,6 +65,7 @@ static struct target_type android_verity_target = {
 	.io_hints               = verity_io_hints,
 };
 
+#ifndef MODULE
 static int __init verified_boot_state_param(char *line)
 {
 	strlcpy(verifiedbootstate, line, sizeof(verifiedbootstate));
@@ -96,6 +97,7 @@ static int __init verity_buildvariant(char *line)
 }
 
 __setup("buildvariant=", verity_buildvariant);
+#endif
 
 static inline bool default_verity_key_id(void)
 {
@@ -644,6 +646,8 @@ static int add_as_linear_device(struct dm_target *ti, char *dev)
 	android_verity_target.merge = dm_linear_merge,
 	android_verity_target.iterate_devices = dm_linear_iterate_devices,
 	android_verity_target.io_hints = NULL;
+
+	set_disk_ro(dm_disk(dm_table_get_md(ti->table)), 0);
 
 	err = dm_linear_ctr(ti, DM_LINEAR_ARGS, linear_table_args);
 
