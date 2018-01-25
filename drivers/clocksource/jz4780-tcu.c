@@ -9,6 +9,7 @@
  */
 
 #include <linux/clocksource.h>
+#include <linux/cpu.h>
 #include <linux/err.h>
 #include <linux/sched_clock.h>
 
@@ -57,6 +58,47 @@ static u64 notrace jz4780_tcu_sched_read(void)
 	return jz47xx_tcu_read_channel_count(jz4780_tcu_clocksource.channel);
 }
 
+#ifdef CONFIG_SMP
+struct jz4780_tcu_notifier_block {
+	struct notifier_block nb;
+	struct jz47xx_tcu *tcu;
+	int channel_number;
+};
+
+static int jz4780_setup_cevt_notify(struct notifier_block *self,
+				      unsigned long action, void *hcpu)
+{
+	struct jz4780_tcu_notifier_block *jz4780_nb;
+	struct jz47xx_tcu *tcu;
+	int channel_number;
+	int err;
+
+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING) {
+		jz4780_nb = container_of(self, struct jz4780_tcu_notifier_block, nb);
+		tcu = jz4780_nb->tcu;
+		channel_number = jz4780_nb->channel_number;
+
+		err = jz47xx_tcu_setup_cevt(tcu, channel_number);
+		BUG_ON(err);
+	}
+
+	return NOTIFY_OK;
+}
+
+struct jz4780_tcu_notifier_block jz4780_nb_channel7 = {
+	.nb = {
+		.notifier_call = jz4780_setup_cevt_notify,
+	},
+	.channel_number = 7,
+};
+
+void jz4780_schedule_setup_cevt_notify(struct notifier_block *nb) {
+	cpu_notifier_register_begin();
+	 __register_cpu_notifier(nb);
+	cpu_notifier_register_done();
+}
+#endif /* CONFIG_SMP */
+
 static void __init jz4780_tcu_init(struct device_node *np)
 {
 	struct jz47xx_tcu *tcu;
@@ -87,6 +129,12 @@ static void __init jz4780_tcu_init(struct device_node *np)
 	/* For tick broadcasts */
 	err = jz47xx_tcu_setup_cevt(tcu, 6);
 	BUG_ON(err);
+
+#ifdef CONFIG_SMP
+	/* Channel 7 clock events setup on the second CPU core */
+	jz4780_nb_channel7.tcu = tcu;
+	jz4780_schedule_setup_cevt_notify(&jz4780_nb_channel7.nb);
+#endif /* CONFIG_SMP */
 }
 
 CLOCKSOURCE_OF_DECLARE(jz4780_tcu, "ingenic,jz4780-tcu", jz4780_tcu_init);
