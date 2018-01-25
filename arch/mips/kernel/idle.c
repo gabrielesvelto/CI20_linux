@@ -226,7 +226,7 @@ void __init check_wait(void)
 		 */
 		break;
 	case CPU_JZRISC:
-#ifdef CONFIG_MACH_JZ4780
+#if defined(CONFIG_MACH_JZ4780) && defined(CONFIG_SMP)
 		if (NR_CPUS > 1) {
 			cpu_wait = jz4780_smp_wait_irqoff;
 		}
