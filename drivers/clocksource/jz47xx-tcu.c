@@ -47,6 +47,8 @@ enum jz47xx_tcu_reg {
 	REG_OSTCNTHBUF	= 0xfc,
 };
 
+static DEFINE_PER_CPU(struct call_single_data, jz47xx_cevt_csd);
+
 #define CHANNEL_STRIDE		0x10
 #define REG_TDFRc(c)		(REG_TDFR0 + (c * CHANNEL_STRIDE))
 #define REG_TDHRc(c)		(REG_TDHR0 + (c * CHANNEL_STRIDE))
@@ -73,6 +75,7 @@ struct jz47xx_tcu_channel {
 	void *full_cb_data, *half_cb_data;
 	unsigned stopped: 1;
 	unsigned enabled: 1;
+	int cpu;
 };
 
 struct jz47xx_tcu_irq {
@@ -88,6 +91,27 @@ struct jz47xx_tcu {
 	struct jz47xx_tcu_channel *channels;
 	struct jz47xx_tcu_irq irqs[NUM_TCU_IRQS];
 };
+
+static void jz47xx_per_cpu_event_handle(void *info)
+{
+	struct jz47xx_tcu_channel *channel = (struct jz47xx_tcu_channel*) info;
+	struct clock_event_device *cevt = channel->full_cb_data;
+
+	if (cevt->event_handler)
+		cevt->event_handler(cevt);
+}
+
+static void jz47xx_tcu_per_cpu_cb(struct jz47xx_tcu_channel *channel)
+{
+	struct call_single_data *csd;
+	int cpu;
+
+	cpu = channel->cpu;
+	csd = &per_cpu(jz47xx_cevt_csd, cpu);
+	csd->info = (void*) channel;
+	csd->func = jz47xx_per_cpu_event_handle;
+	smp_call_function_single_async(cpu, csd);
+}
 
 static inline u32 notrace tcu_readl(struct jz47xx_tcu *tcu, enum jz47xx_tcu_reg reg)
 {
@@ -561,9 +585,7 @@ static void jz47xx_tcu_cevt_cb(struct jz47xx_tcu_channel *channel, void *data)
 	struct clock_event_device *cevt = data;
 
 	jz47xx_tcu_disable_channel(channel);
-
-	if (cevt->event_handler)
-		cevt->event_handler(cevt);
+	jz47xx_tcu_per_cpu_cb(channel);
 }
 
 static void jz47xx_tcu_cevt_set_mode(enum clock_event_mode mode,
@@ -608,6 +630,8 @@ int jz47xx_tcu_setup_cevt(struct jz47xx_tcu *tcu, int idx)
 		err = PTR_ERR(channel);
 		goto err_out;
 	}
+
+	channel->cpu = smp_processor_id();
 
 	rate = jz47xx_tcu_set_channel_rate(channel, JZ47XX_TCU_SRC_EXTAL,
 					   1000000);
