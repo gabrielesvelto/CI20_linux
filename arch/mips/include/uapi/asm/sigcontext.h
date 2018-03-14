@@ -49,6 +49,7 @@ struct sigcontext {
 	unsigned long		sc_lo2;
 	unsigned long		sc_hi3;
 	unsigned long		sc_lo3;
+	unsigned long		sc_mxu[16];	/*NUM_MXU_REGS = 16*/
 };
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
@@ -82,6 +83,7 @@ struct sigcontext {
 	__u32	sc_used_math;
 	__u32	sc_dsp;
 	__u32	sc_reserved;
+	__u32   sc_mxu[16];             /*NUM_MXU_REGS = 16*/
 };
 
 

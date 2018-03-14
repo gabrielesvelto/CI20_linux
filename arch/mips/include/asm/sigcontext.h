@@ -31,6 +31,7 @@ struct sigcontext32 {
 	__u32		sc_hi2;		/* Was sc_sigset[4] */
 	__u32		sc_lo2;
 	__u32		sc_hi3;
+	__u32		sc_mxu[16];	/*NUM_MXU_REGS = 16*/
 	__u32		sc_lo3;
 };
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 || _MIPS_SIM == _MIPS_SIM_NABI32 */

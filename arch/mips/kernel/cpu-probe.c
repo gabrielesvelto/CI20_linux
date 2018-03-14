@@ -1506,6 +1506,8 @@ static inline void cpu_probe_ingenic(struct cpuinfo_mips *c, unsigned int cpu)
 		c->cputype = CPU_JZRISC;
 		c->writecombine = _CACHE_UNCACHED_ACCELERATED;
 		__cpu_name[cpu] = "Ingenic JZRISC";
+
+		c->ases |= MIPS_ASE_XBURSTMXU;
 		break;
 	default:
 		panic("Unknown Ingenic Processor ID!");

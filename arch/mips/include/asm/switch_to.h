@@ -17,6 +17,7 @@
 #include <asm/dsp.h>
 #include <asm/cop2.h>
 #include <asm/fpu.h>
+#include <asm/mxu.h>
 
 struct task_struct;
 
@@ -106,6 +107,10 @@ do {									\
 	if (cpu_has_dsp) {						\
 		__save_dsp(prev);					\
 		__restore_dsp(next);					\
+	}								\
+	if (cpu_has_mxu) {						\
+		__save_mxu(prev);					\
+		__restore_mxu(next);					\
 	}								\
 	if (cop2_present) {						\
 		set_c0_status(ST0_CU2);					\
