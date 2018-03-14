@@ -47,6 +47,10 @@
 #define user_siginfo_t siginfo_t
 #endif
 
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+#define elf_check_arm(hdr)	((hdr)->e_machine != 40)
+#endif
+
 static int load_elf_binary(struct linux_binprm *bprm);
 static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
 				int, int, unsigned long);
@@ -680,6 +684,10 @@ static int load_elf_binary(struct linux_binprm *bprm)
 	unsigned long reloc_func_desc __maybe_unused = 0;
 	int executable_stack = EXSTACK_DEFAULT;
 	struct pt_regs *regs = current_pt_regs();
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+	int is_arm_exec = 0;
+#endif
+
 	struct {
 		struct elfhdr elf_ex;
 		struct elfhdr interp_elf_ex;
@@ -702,8 +710,19 @@ static int load_elf_binary(struct linux_binprm *bprm)
 
 	if (loc->elf_ex.e_type != ET_EXEC && loc->elf_ex.e_type != ET_DYN)
 		goto out;
+
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+	if (!elf_check_arm(&loc->elf_ex)) {
+		is_arm_exec = 1;
+	} else {
+		if (!elf_check_arch(&loc->elf_ex))
+			goto out;
+	}
+#else
 	if (!elf_check_arch(&loc->elf_ex))
 		goto out;
+#endif
+
 	if (!bprm->file->f_op->mmap)
 		goto out;
 
@@ -776,6 +795,34 @@ static int load_elf_binary(struct linux_binprm *bprm)
 		}
 		elf_ppnt++;
 	}
+
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+	if (!elf_interpreter && is_arm_exec) {
+		/* Same to above */
+		const char *armlinker = "/system/bin/linker";
+		elf_interpreter = kmalloc(strlen(armlinker) + 1,
+					  GFP_KERNEL);
+		if (!elf_interpreter)
+			goto out_free_ph;
+		strcpy(elf_interpreter, armlinker);
+		interpreter = open_exec(elf_interpreter);
+		retval = PTR_ERR(interpreter);
+		if (IS_ERR(interpreter))
+			goto out_free_interp;
+
+		if (inode_permission(interpreter->f_path.dentry->d_inode, MAY_READ) < 0)
+			bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
+
+		retval = kernel_read(interpreter, 0, bprm->buf,
+				     BINPRM_BUF_SIZE);
+		if (retval != BINPRM_BUF_SIZE) {
+			if (retval >= 0)
+				retval = -EIO;
+			goto out_free_dentry;
+		}
+		loc->interp_elf_ex = *((struct elfhdr *)bprm->buf);
+	}
+#endif
 
 	elf_ppnt = elf_phdata;
 	for (i = 0; i < loc->elf_ex.e_phnum; i++, elf_ppnt++)
