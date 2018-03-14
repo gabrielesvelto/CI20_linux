@@ -1,0 +1,18 @@
+Ingenic JZ4780 Codec controller
+
+Required properties:
+- compatible : "ingenic,jz4780-codec"
+- reg : codec registers location and length
+- clock : I2S PLL clock specifier.
+- clock-names: "i2s"
+
+Example:
+
+codec: codec@100200a4 {
+	compatible = "ingenic,jz4780-codec";
+	reg = <0x100200a4 0x8>;
+
+	clocks = <&cgu JZ4780_CLK_I2SPLL>;
+	clock-names = "i2s";
+
+};
