@@ -1,0 +1,3 @@
+source "drivers/staging/imgtec/sgx/Kconfig"
+
+source "drivers/staging/imgtec/pvr_jz4780/Kconfig"

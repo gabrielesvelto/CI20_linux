@@ -1,0 +1,24 @@
+config POWERVR_SGX
+	tristate "PowerVR SGX"
+	default n
+	help
+	  Driver for PowerVR SGX graphics hardware.
+
+	  Say Y here if your SoC contains a PowerVR SGX GPU. For more
+	  information, see <http://www.imgtec.com/powervr/>.
+
+config POWERVR_SGX_PDUMP
+	bool "Parameter dumping"
+	default n
+	depends on POWERVR_SGX
+
+config POWERVR_SGX_TTRACE
+	bool "Timed trace support"
+	default n
+	depends on POWERVR_SGX
+
+config POWERVR_SGX_SYSTRACE
+	bool "Systrace support"
+	default n
+	depends on POWERVR_SGX
+	select GPU_TRACEPOINTS
