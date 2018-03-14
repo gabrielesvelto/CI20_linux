@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
+#include <asm/mach-jz4740/jz4780-cgu.h>
 
 struct jz4740_ohci_hcd {
 	struct ohci_hcd ohci_hcd;
@@ -168,6 +169,12 @@ static int jz4740_ohci_probe(struct platform_device *pdev)
 	jz4740_ohci = hcd_to_jz4740_hcd(hcd);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+	if (!res) {
+		dev_err(&pdev->dev, "Failed to get platform resource\n");
+		return -ENOENT;
+	}
+
 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(hcd->regs)) {
 		ret = PTR_ERR(hcd->regs);
@@ -192,6 +199,14 @@ static int jz4740_ohci_probe(struct platform_device *pdev)
 	clk_enable(jz4740_ohci->clk);
 	if (jz4740_ohci->vbus)
 		ohci_jz4740_set_vbus_power(jz4740_ohci, true);
+
+	if (of_machine_is_compatible("ingenic,jz4780-ohci")) {
+		ret = jz4780_cgu_set_usb_suspend(USB_PORT_HOST, false);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to unsuspend port\n");
+			goto err_disable;
+		}
+	}
 
 	platform_set_drvdata(pdev, hcd);
 
@@ -234,12 +249,20 @@ static int jz4740_ohci_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static struct of_device_id jz4740_ohci_of_match[] = {
+	{ .compatible = "ingenic,jz4740-ohci", },
+	{ .compatible = "ingenic,jz4780-ohci", },
+	{ },
+};
+
 static struct platform_driver ohci_hcd_jz4740_driver = {
 	.probe = jz4740_ohci_probe,
 	.remove = jz4740_ohci_remove,
 	.driver = {
 		.name = "jz4740-ohci",
+		.of_match_table = jz4740_ohci_of_match,
 	},
 };
 
 MODULE_ALIAS("platform:jz4740-ohci");
+MODULE_DEVICE_TABLE(of, jz4740_ohci_of_match);
