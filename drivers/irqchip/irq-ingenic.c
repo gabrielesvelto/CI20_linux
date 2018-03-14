@@ -28,6 +28,8 @@
 
 #include <asm/io.h>
 #include <asm/mach-jz4740/irq.h>
+#include <asm/mach-jz4740/jz4780-smp.h>
+#include <asm/mipsregs.h>
 
 struct ingenic_intc_data {
 	void __iomem *base;
@@ -40,6 +42,25 @@ struct ingenic_intc_data {
 #define JZ_REG_INTC_CLEAR_MASK	0x0c
 #define JZ_REG_INTC_PENDING	0x10
 #define CHIP_SIZE		0x20
+
+asmlinkage void plat_irq_dispatch(void)
+{
+	uint32_t pending = read_c0_cause() & read_c0_status() & CAUSEF_IP;
+	if (pending & CAUSEF_IP4) {
+		/* from OS timer */
+		do_IRQ(4);
+#ifdef CONFIG_SMP
+	} else if (pending & CAUSEF_IP3) {
+		/* from a mailbox write */
+		do_IRQ(3);
+#endif
+	} else if (pending & CAUSEF_IP2) {
+		/* from interrupt controller */
+		do_IRQ(2);
+	} else {
+		spurious_interrupt();
+	}
+}
 
 static irqreturn_t intc_cascade(int irq, void *data)
 {

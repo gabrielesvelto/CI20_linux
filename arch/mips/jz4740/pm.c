@@ -18,6 +18,7 @@
 #include <linux/delay.h>
 #include <linux/suspend.h>
 
+#ifdef CONFIG_MACH_JZ4740
 #include <asm/mach-jz4740/clock.h>
 
 static int jz4740_pm_enter(suspend_state_t state)
@@ -49,3 +50,24 @@ static int __init jz4740_pm_init(void)
 
 }
 late_initcall(jz4740_pm_init);
+#endif
+
+#ifdef CONFIG_MACH_JZ4780
+static int jz4780_pm_enter(suspend_state_t state)
+{
+	return 0;
+}
+
+static const struct platform_suspend_ops jz4780_pm_ops = {
+	.valid		= suspend_valid_only_mem,
+	.enter		= jz4780_pm_enter,
+};
+
+static int __init jz4780_pm_init(void)
+{
+	suspend_set_ops(&jz4780_pm_ops);
+	return 0;
+
+}
+late_initcall(jz4780_pm_init);
+#endif

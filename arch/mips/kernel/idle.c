@@ -14,6 +14,7 @@
 #include <linux/export.h>
 #include <linux/init.h>
 #include <linux/irqflags.h>
+#include <linux/leds.h>
 #include <linux/printk.h>
 #include <linux/sched.h>
 #include <asm/cpu.h>
@@ -21,6 +22,10 @@
 #include <asm/cpu-type.h>
 #include <asm/idle.h>
 #include <asm/mipsregs.h>
+
+#ifdef CONFIG_MACH_JZ4780
+# include <asm/mach-jz4740/jz4780-smp.h>
+#endif
 
 /*
  * Not all of the MIPS CPUs have the "wait" instruction available. Moreover,
@@ -175,7 +180,6 @@ void __init check_wait(void)
 	case CPU_CAVIUM_OCTEON_PLUS:
 	case CPU_CAVIUM_OCTEON2:
 	case CPU_CAVIUM_OCTEON3:
-	case CPU_JZRISC:
 	case CPU_LOONGSON1:
 	case CPU_XLR:
 	case CPU_XLP:
@@ -243,9 +247,29 @@ void __init check_wait(void)
 		   cpu_wait = r4k_wait;
 		 */
 		break;
+	case CPU_JZRISC:
+#if defined(CONFIG_MACH_JZ4780) && defined(CONFIG_SMP)
+		if (NR_CPUS > 1) {
+			cpu_wait = jz4780_smp_wait_irqoff;
+		} else {
+			cpu_wait = r4k_wait;
+		}
+#else
+		cpu_wait = r4k_wait;
+#endif
 	default:
 		break;
 	}
+}
+
+void arch_cpu_idle_enter(void)
+{
+	ledtrig_cpu(CPU_LED_IDLE_START);
+}
+
+void arch_cpu_idle_exit(void)
+{
+	ledtrig_cpu(CPU_LED_IDLE_END);
 }
 
 void arch_cpu_idle(void)
