@@ -58,6 +58,10 @@ void __init plat_mem_setup(void)
 {
 	int offset;
 
+#ifdef CONFIG_MACH_JZ4780
+	set_io_port_base(IO_BASE);
+#endif
+
 	jz4740_reset_init();
 	__dt_setup_arch(__dtb_start);
 
