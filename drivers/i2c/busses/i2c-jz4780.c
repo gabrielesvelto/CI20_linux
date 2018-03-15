@@ -704,8 +704,11 @@ static int jz4780_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msg,
 			ret = jz4780_i2c_xfer_write(i2c, msg->buf, msg->len,
 						    count, i);
 
-		if (ret)
+		if (ret) {
+			dev_err(&i2c->adap.dev, "I2C xfer failed\n");
+			ret = -EAGAIN;
 			goto out;
+		}
 	}
 
 	ret = i;
