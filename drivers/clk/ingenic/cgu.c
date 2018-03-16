@@ -663,6 +663,7 @@ ingenic_cgu_new(const struct ingenic_cgu_clk_info *clock_info,
 	cgu->clocks.clk_num = num_clocks;
 
 	spin_lock_init(&cgu->lock);
+	spin_lock_init(&cgu->power_lock);
 
 	return cgu;
 

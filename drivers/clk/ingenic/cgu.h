@@ -180,6 +180,7 @@ struct ingenic_cgu {
 	struct clk_onecell_data clocks;
 
 	spinlock_t lock;
+	spinlock_t power_lock;
 };
 
 /**
