@@ -335,4 +335,8 @@ config CLKSRC_ST_LPC
 	  Enable this option to use the Low Power controller timer
 	  as clocksource.
 
+config INGENIC_TCU
+	bool
+	depends on MACH_INGENIC
+
 endmenu
