@@ -339,7 +339,7 @@ ingenic_clk_calc_div(const struct ingenic_cgu_clk_info *clk_info,
 	unsigned div;
 
 	/* calculate the divide */
-	div = DIV_ROUND_UP(parent_rate, req_rate);
+	div = DIV_ROUND_CLOSEST(parent_rate, req_rate);
 
 	/* and impose hardware constraints */
 	div = min_t(unsigned, div, 1 << clk_info->div.bits);
