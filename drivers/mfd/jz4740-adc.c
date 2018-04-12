@@ -201,6 +201,11 @@ static const struct mfd_cell jz4740_adc_cells[] = {
 	{
 		.id = 1,
 		.name = "jz4740-battery",
+#ifdef CONFIG_MACH_JZ4780
+		.of_compatible = "ingenic,jz4780-adc,battery",
+#else
+		.of_compatible = "ingenic,jz4740-adc,battery",
+#endif
 		.num_resources = ARRAY_SIZE(jz4740_battery_resources),
 		.resources = jz4740_battery_resources,
 
