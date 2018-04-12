@@ -292,6 +292,13 @@ config BATTERY_JZ4740
 	  This driver can be build as a module. If so, the module will be
 	  called jz4740-battery.
 
+config CHARGER_AC_JZ4780
+	tristate "Ingenic JZ4780 AC charger"
+	depends on BATTERY_JZ4780
+	depends on GPIOLIB
+	help
+	  JZ4780 charger driver is used in combination with JZ4780 battery driver
+
 config BATTERY_INTEL_MID
 	tristate "Battery driver for Intel MID platforms"
 	depends on INTEL_SCU_IPC && SPI

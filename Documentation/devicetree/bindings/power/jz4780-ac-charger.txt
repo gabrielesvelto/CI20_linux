@@ -1,0 +1,21 @@
+
+
+* * jz4780-ac-charger AC charger controller
+
+Required properties:
+- compatible: must be "ingenic,jz4780-charger"
+- gpio-ac: GPIO which is used to indicate the chargers status
+- gpio-charging: GPIO which is used to indicate the charging status
+
+Optional properties:
+- ac-name: Name for the charger's power_supply device
+- type: Type of the charger
+
+Example:
+
+	charger {
+		compatible = "ingenic,jz4780-charger";
+		gpio-ac = <&gpa 16 GPIO_ACTIVE_HIGH>;
+		gpio-charging = <&gpb 3 GPIO_ACTIVE_LOW>;
+	};
+
