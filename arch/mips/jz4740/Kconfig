@@ -11,6 +11,10 @@ config JZ4780_CI20
 	bool "MIPS Creator CI20"
 	select MACH_JZ4780
 
+config JZ4780_NPM801
+	bool "NPM801 Ingenic tablet"
+	select MACH_JZ4780
+
 endchoice
 
 config MACH_JZ4740
