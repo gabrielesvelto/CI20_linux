@@ -84,6 +84,13 @@ config IIO_ST_ACCEL_SPI_3AXIS
 	depends on IIO_ST_ACCEL_3AXIS
 	depends on IIO_ST_SENSORS_SPI
 
+config JZ4780_MMA8452
+	tristate "Ingenic JZ4780 MMA8452Q Accelerometer driver"
+	depends on I2C
+	help
+	  Say yes here to build Ingenic support for the Freescale MMA8452Q
+	  3-Axis Orientation/Motion Detection Sensor driver.
+
 config KXSD9
 	tristate "Kionix KXSD9 Accelerometer Driver"
 	depends on SPI
