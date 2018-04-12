@@ -27,6 +27,14 @@ config LCD_CLASS_DEVICE
 
 if LCD_CLASS_DEVICE
 
+config LCD_CRD080TI01_40NM01
+       tristate "LCD_CRD080TI01_40NM01 LVDS TFT panel(1024x768)"
+       depends on BACKLIGHT_CLASS_DEVICE
+       default n
+       help
+         If you have a LCD_CRD080TI01_40NM01 Panel, say Y to enable its
+         control driver.
+
 config LCD_CORGI
 	tristate "LCD Panel support for SHARP corgi/spitz model"
 	depends on SPI_MASTER && PXA_SHARPSL && BACKLIGHT_CLASS_DEVICE

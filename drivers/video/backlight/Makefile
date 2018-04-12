@@ -3,6 +3,7 @@
 obj-$(CONFIG_LCD_AMS369FG06)		+= ams369fg06.o
 obj-$(CONFIG_LCD_CLASS_DEVICE)		+= lcd.o
 obj-$(CONFIG_LCD_CORGI)			+= corgi_lcd.o
+obj-$(CONFIG_LCD_CRD080TI01_40NM01)    += crd080ti01_40nm01.o
 obj-$(CONFIG_LCD_HP700)			+= jornada720_lcd.o
 obj-$(CONFIG_LCD_HX8357)		+= hx8357.o
 obj-$(CONFIG_LCD_ILI922X)		+= ili922x.o
