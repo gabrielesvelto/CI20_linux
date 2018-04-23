@@ -125,7 +125,7 @@ static int create_xattr(struct ubifs_info *c, struct inode *host,
 		return -ENOSPC;
 	}
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -206,7 +206,7 @@ static int change_xattr(struct ubifs_info *c, struct inode *host,
 		.dirtied_ino_d = ALIGN(size, 8) + ALIGN(host_ui->data_len, 8) };
 
 	ubifs_assert(ui->data_len == inode->i_size);
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -511,7 +511,7 @@ static int remove_xattr(struct ubifs_info *c, struct inode *host,
 
 	ubifs_assert(ui->data_len == inode->i_size);
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 

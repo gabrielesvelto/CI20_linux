@@ -591,6 +591,20 @@ int ubi_rename_volumes(struct ubi_device *ubi, struct list_head *rename_list)
 	return err;
 }
 
+static int vol_uevent(struct ubi_volume *vol, struct kobj_uevent_env *env)
+{
+	add_uevent_var(env, "PARTN=%d", vol->vol_id);
+	if(vol->name && vol->name[0] != '\0')
+		add_uevent_var(env, "PARTNAME=%s", vol->name);
+
+	return 0;
+}
+
+static struct device_type ubi_devtype = {
+	.name       = "ubi",
+	.uevent     = vol_uevent,
+};
+
 /**
  * ubi_add_volume - add volume.
  * @ubi: UBI device description object
@@ -623,6 +637,7 @@ int ubi_add_volume(struct ubi_device *ubi, struct ubi_volume *vol)
 	vol->dev.devt = dev;
 	vol->dev.class = &ubi_class;
 	vol->dev.groups = volume_dev_groups;
+	vol->dev.type = &ubi_devtype;
 	dev_set_name(&vol->dev, "%s_%d", ubi->ubi_name, vol->vol_id);
 	err = device_register(&vol->dev);
 	if (err)

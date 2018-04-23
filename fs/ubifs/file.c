@@ -50,6 +50,7 @@
  */
 
 #include "ubifs.h"
+#include <linux/falloc.h>
 #include <linux/mount.h>
 #include <linux/slab.h>
 #include <linux/migrate.h>
@@ -244,7 +245,7 @@ static int write_begin_slow(struct address_space *mapping,
 		/* We are appending data, budget for inode change */
 		req.dirtied_ino = 1;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (unlikely(err))
 		return err;
 
@@ -387,7 +388,7 @@ static int allocate_budget(struct ubifs_info *c, struct page *page,
 		}
 	}
 
-	return ubifs_budget_space(c, &req);
+	return ubifs_budget_space(c, &req, ui);
 }
 
 /*
@@ -1125,7 +1126,7 @@ static int do_truncation(struct ubifs_info *c, struct inode *inode,
 	req.dirtied_ino = 1;
 	/* A funny way to budget for truncation node */
 	req.dirtied_ino_d = UBIFS_TRUN_NODE_SZ;
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (err) {
 		/*
 		 * Treat truncations to zero as deletion and always allow them,
@@ -1217,7 +1218,7 @@ static int do_setattr(struct ubifs_info *c, struct inode *inode,
 	struct ubifs_budget_req req = { .dirtied_ino = 1,
 				.dirtied_ino_d = ALIGN(ui->data_len, 8) };
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (err)
 		return err;
 
@@ -1372,7 +1373,7 @@ int ubifs_update_time(struct inode *inode, struct timespec *time,
 	int iflags = I_DIRTY_TIME;
 	int err, release;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, 0);
 	if (err)
 		return err;
 
@@ -1415,7 +1416,7 @@ static int update_mctime(struct inode *inode)
 		struct ubifs_budget_req req = { .dirtied_ino = 1,
 				.dirtied_ino_d = ALIGN(ui->data_len, 8) };
 
-		err = ubifs_budget_space(c, &req);
+		err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 		if (err)
 			return err;
 
@@ -1535,7 +1536,7 @@ static int ubifs_vm_page_mkwrite(struct vm_area_struct *vma,
 		 */
 		req.dirtied_ino = 1;
 
-	err = ubifs_budget_space(c, &req);
+	err = ubifs_budget_space(c, &req, ubifs_inode(inode));
 	if (unlikely(err)) {
 		if (err == -ENOSPC)
 			ubifs_warn(c, "out of space for mmapped file (inode number %lu)",
@@ -1585,6 +1586,170 @@ out_unlock:
 	return err;
 }
 
+/*
+ * TODO: Implement optimization that avoids actual writing
+ * of the whole data to disk.
+ */
+long ubifs_write_zeros(struct file *file, loff_t offset, loff_t len)
+{
+	loff_t i;
+	loff_t counter = len / UBIFS_BLOCK_SIZE;
+	char zero_buffer[UBIFS_BLOCK_SIZE] = {0};
+	int remainder = len % UBIFS_BLOCK_SIZE;;
+	long ret = 0, write_ret;
+	struct ubifs_info *c = file_inode(file)->i_sb->s_fs_info;
+
+	for (i = 0; i < counter; i++) {
+		write_ret = __vfs_write(file, zero_buffer, UBIFS_BLOCK_SIZE, &offset);
+		if(write_ret <= 0) {
+			ret = write_ret;
+			goto error;
+		}
+		ret += write_ret;
+	}
+
+	if (remainder) {
+		write_ret = __vfs_write(file, zero_buffer, remainder, &offset);
+		if (write_ret <= 0) {
+			ret = write_ret;
+			goto error;
+		}
+		ret += write_ret;
+	}
+
+	return ret;
+
+error:
+	ubifs_err(c, "Writing zeros error: %ld", ret);
+	return ret;
+}
+
+/*
+ * Has to be called under c->space_lock
+ */
+static long ubifs_preallocate(struct ubifs_inode *ui, struct ubifs_info *c,
+	loff_t new_size)
+{
+	if (new_size > ui->reserved_ui_size) {
+		loff_t lebs_available, lebs_needed, lebs_used, remainder;
+		loff_t usable_leb_size = c->leb_size - c->leb_overhead;
+
+		lebs_available = c->lst.empty_lebs - c->lst.taken_empty_lebs -
+			c->lst.reserved_empty_lebs;
+
+		lebs_used = div_u64(ui->ui_size, usable_leb_size);
+		div_u64_rem(ui->ui_size, usable_leb_size, &remainder);
+		if (remainder)
+			lebs_used++;
+
+		lebs_needed = div_u64(new_size, usable_leb_size) - lebs_used -
+			ui->reserved_leb_cnt;
+		div_u64_rem(new_size, usable_leb_size, &remainder);
+		if (remainder)
+			lebs_needed++;
+
+		if (lebs_available <= lebs_needed) {
+			ubifs_err(c, "Not enough LEBs available");
+			return -ENOSPC;
+		}
+
+		if (lebs_needed > 0) {
+			c->lst.reserved_empty_lebs += lebs_needed;
+			ui->reserved_leb_cnt += lebs_needed;
+		}
+
+		ui->reserved_ui_size = new_size;
+	}
+
+	return 0;
+}
+
+long ubifs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
+{
+	int ret = 0;
+	struct iattr attr;
+	struct inode *inode = file_inode(file);
+	struct ubifs_inode *ui = ubifs_inode(inode);
+	struct ubifs_info *c = inode->i_sb->s_fs_info;
+	loff_t new_size = offset + len;
+
+	if (offset < 0 || len <= 0)
+		return -EINVAL;
+
+	switch (mode) {
+	case FALLOC_FL_KEEP_SIZE:
+
+		ret = inode_newsize_ok(inode, new_size);
+		if (ret) {
+			ubifs_err(c, "File size error: %d", ret);
+			break;
+		}
+
+		spin_lock(&c->space_lock);
+		if(new_size >= ui->ui_size &&
+			new_size - ui->ui_size <= ubifs_get_free_space_nolock(c)) {
+			ret = ubifs_preallocate(ui, c, new_size);
+		}
+		spin_unlock(&c->space_lock);
+
+		break;
+	case FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE:
+		{
+			loff_t new_len = len;
+
+			if (new_size > ui->ui_size)
+				new_len = ui->ui_size - offset;
+
+			if (offset >= ui->ui_size) {
+				ubifs_err(c, "Invalid offset value");
+				ret = -EINVAL;
+				break;
+			}
+
+			ret = ubifs_write_zeros(file, offset, new_len);
+
+			break;
+		}
+	case FALLOC_FL_ZERO_RANGE:
+		{
+			if (offset > ui->ui_size)
+				offset = (loff_t) ui->ui_size;
+
+			if (new_size <= ui->ui_size) {
+				ret = ubifs_write_zeros(file, offset, len);
+				break;
+			} else {
+				loff_t overwrite_len = ui->ui_size - offset;
+
+				if (overwrite_len > 0) {
+					ret = ubifs_write_zeros(file, offset, overwrite_len);
+					if (ret <= 0)
+						break;
+				}
+
+				/*
+				 * Fall through
+				 */
+			}
+		}
+	case 0:
+		if (new_size > ui->ui_size) {
+			attr.ia_size = new_size;
+			attr.ia_valid = ATTR_SIZE;
+
+			ret = ubifs_setattr(file->f_path.dentry, &attr);
+			if (ret)
+				ubifs_err(c, "failed to set size attribute");
+		}
+
+		break;
+	default:
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
 static const struct vm_operations_struct ubifs_file_vm_ops = {
 	.fault        = filemap_fault,
 	.map_pages = filemap_map_pages,
@@ -1602,6 +1767,22 @@ static int ubifs_file_mmap(struct file *file, struct vm_area_struct *vma)
 #ifdef CONFIG_UBIFS_ATIME_SUPPORT
 	file_accessed(file);
 #endif
+	return 0;
+}
+
+static int ubifs_release_file(struct inode *inode, struct file *file)
+{
+	struct ubifs_inode *ui = ubifs_inode(inode);
+	struct ubifs_info *c = inode->i_sb->s_fs_info;
+
+	spin_lock(&c->space_lock);
+	if (ui->reserved_ui_size) {
+		c->lst.reserved_empty_lebs -= ui->reserved_leb_cnt;
+		ui->reserved_leb_cnt = 0;
+		ui->reserved_ui_size = 0;
+	}
+	spin_unlock(&c->space_lock);
+
 	return 0;
 }
 
@@ -1653,6 +1834,8 @@ const struct file_operations ubifs_file_operations = {
 	.unlocked_ioctl = ubifs_ioctl,
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
+	.release	= ubifs_release_file,
+	.fallocate	= ubifs_fallocate,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = ubifs_compat_ioctl,
 #endif
