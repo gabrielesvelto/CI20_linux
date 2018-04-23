@@ -325,6 +325,7 @@ ingenic_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 		div = (div_reg >> clk_info->div.shift) &
 		      GENMASK(clk_info->div.bits - 1, 0);
 		div += 1;
+		div <<= clk_info->div.div;
 
 		rate /= div;
 	}
@@ -339,11 +340,17 @@ ingenic_clk_calc_div(const struct ingenic_cgu_clk_info *clk_info,
 	unsigned div;
 
 	/* calculate the divide */
-	div = DIV_ROUND_UP(parent_rate, req_rate);
+	div = DIV_ROUND_CLOSEST(parent_rate, req_rate);
 
 	/* and impose hardware constraints */
 	div = min_t(unsigned, div, 1 << clk_info->div.bits);
 	div = max_t(unsigned, div, 1);
+
+	/* If the divider value itself must be divided before being written to
+	 * the divider register, we must ensure we don't have any bits set that
+	 * would be lost as a result of doing so. */
+	div >>= clk_info->div.div;
+	div <<= clk_info->div.div;
 
 	return div;
 }
@@ -395,7 +402,7 @@ ingenic_clk_set_rate(struct clk_hw *hw, unsigned long req_rate,
 		/* update the divide */
 		mask = GENMASK(clk_info->div.bits - 1, 0);
 		reg &= ~(mask << clk_info->div.shift);
-		reg |= (div - 1) << clk_info->div.shift;
+		reg |= ((div >> clk_info->div.div) - 1) << clk_info->div.shift;
 
 		/* clear the stop bit */
 		if (clk_info->div.stop_bit != -1)
@@ -663,6 +670,7 @@ ingenic_cgu_new(const struct ingenic_cgu_clk_info *clock_info,
 	cgu->clocks.clk_num = num_clocks;
 
 	spin_lock_init(&cgu->lock);
+	spin_lock_init(&cgu->power_lock);
 
 	return cgu;
 

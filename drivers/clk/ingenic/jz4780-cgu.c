@@ -15,85 +15,13 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/delay.h>
 #include <linux/of.h>
+#include <asm/mach-jz4740/jz4780-cgu.h>
 #include <dt-bindings/clock/jz4780-cgu.h>
 #include "cgu.h"
-
-/* CGU register offsets */
-#define CGU_REG_CLOCKCONTROL	0x00
-#define CGU_REG_PLLCONTROL	0x0c
-#define CGU_REG_APLL		0x10
-#define CGU_REG_MPLL		0x14
-#define CGU_REG_EPLL		0x18
-#define CGU_REG_VPLL		0x1c
-#define CGU_REG_CLKGR0		0x20
-#define CGU_REG_OPCR		0x24
-#define CGU_REG_CLKGR1		0x28
-#define CGU_REG_DDRCDR		0x2c
-#define CGU_REG_VPUCDR		0x30
-#define CGU_REG_USBPCR		0x3c
-#define CGU_REG_USBRDT		0x40
-#define CGU_REG_USBVBFIL	0x44
-#define CGU_REG_USBPCR1		0x48
-#define CGU_REG_LP0CDR		0x54
-#define CGU_REG_I2SCDR		0x60
-#define CGU_REG_LP1CDR		0x64
-#define CGU_REG_MSC0CDR		0x68
-#define CGU_REG_UHCCDR		0x6c
-#define CGU_REG_SSICDR		0x74
-#define CGU_REG_CIMCDR		0x7c
-#define CGU_REG_PCMCDR		0x84
-#define CGU_REG_GPUCDR		0x88
-#define CGU_REG_HDMICDR		0x8c
-#define CGU_REG_MSC1CDR		0xa4
-#define CGU_REG_MSC2CDR		0xa8
-#define CGU_REG_BCHCDR		0xac
-#define CGU_REG_CLOCKSTATUS	0xd4
-
-/* bits within the OPCR register */
-#define OPCR_SPENDN0		(1 << 7)
-#define OPCR_SPENDN1		(1 << 6)
-
-/* bits within the USBPCR register */
-#define USBPCR_USB_MODE		BIT(31)
-#define USBPCR_IDPULLUP_MASK	(0x3 << 28)
-#define USBPCR_COMMONONN	BIT(25)
-#define USBPCR_VBUSVLDEXT	BIT(24)
-#define USBPCR_VBUSVLDEXTSEL	BIT(23)
-#define USBPCR_POR		BIT(22)
-#define USBPCR_OTG_DISABLE	BIT(20)
-#define USBPCR_COMPDISTUNE_MASK	(0x7 << 17)
-#define USBPCR_OTGTUNE_MASK	(0x7 << 14)
-#define USBPCR_SQRXTUNE_MASK	(0x7 << 11)
-#define USBPCR_TXFSLSTUNE_MASK	(0xf << 7)
-#define USBPCR_TXPREEMPHTUNE	BIT(6)
-#define USBPCR_TXHSXVTUNE_MASK	(0x3 << 4)
-#define USBPCR_TXVREFTUNE_MASK	0xf
-
-/* bits within the USBPCR1 register */
-#define USBPCR1_REFCLKSEL_SHIFT	26
-#define USBPCR1_REFCLKSEL_MASK	(0x3 << USBPCR1_REFCLKSEL_SHIFT)
-#define USBPCR1_REFCLKSEL_CORE	(0x2 << USBPCR1_REFCLKSEL_SHIFT)
-#define USBPCR1_REFCLKDIV_SHIFT	24
-#define USBPCR1_REFCLKDIV_MASK	(0x3 << USBPCR1_REFCLKDIV_SHIFT)
-#define USBPCR1_REFCLKDIV_19_2	(0x3 << USBPCR1_REFCLKDIV_SHIFT)
-#define USBPCR1_REFCLKDIV_48	(0x2 << USBPCR1_REFCLKDIV_SHIFT)
-#define USBPCR1_REFCLKDIV_24	(0x1 << USBPCR1_REFCLKDIV_SHIFT)
-#define USBPCR1_REFCLKDIV_12	(0x0 << USBPCR1_REFCLKDIV_SHIFT)
-#define USBPCR1_USB_SEL		BIT(28)
-#define USBPCR1_WORD_IF0	BIT(19)
-#define USBPCR1_WORD_IF1	BIT(18)
-
-/* bits within the USBRDT register */
-#define USBRDT_VBFIL_LD_EN	BIT(25)
-#define USBRDT_USBRDT_MASK	0x7fffff
-
-/* bits within the USBVBFIL register */
-#define USBVBFIL_IDDIGFIL_SHIFT	16
-#define USBVBFIL_IDDIGFIL_MASK	(0xffff << USBVBFIL_IDDIGFIL_SHIFT)
-#define USBVBFIL_USBVBFIL_MASK	(0xffff)
 
 static struct ingenic_cgu *cgu;
 
@@ -296,13 +224,13 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 	[JZ4780_CLK_CPU] = {
 		"cpu", CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_CPUMUX, -1, -1, -1 },
-		.div = { CGU_REG_CLOCKCONTROL, 0, 4, 22, -1, -1 },
+		.div = { CGU_REG_CLOCKCONTROL, 0, 0, 4, 22, -1, -1 },
 	},
 
 	[JZ4780_CLK_L2CACHE] = {
 		"l2cache", CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_CPUMUX, -1, -1, -1 },
-		.div = { CGU_REG_CLOCKCONTROL, 4, 4, -1, -1, -1 },
+		.div = { CGU_REG_CLOCKCONTROL, 4, 0, 4, -1, -1, -1 },
 	},
 
 	[JZ4780_CLK_AHB0] = {
@@ -310,7 +238,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { -1, JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL },
 		.mux = { CGU_REG_CLOCKCONTROL, 26, 2 },
-		.div = { CGU_REG_CLOCKCONTROL, 8, 4, 21, -1, -1 },
+		.div = { CGU_REG_CLOCKCONTROL, 8, 0, 4, 21, -1, -1 },
 	},
 
 	[JZ4780_CLK_AHB2PMUX] = {
@@ -323,20 +251,20 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 	[JZ4780_CLK_AHB2] = {
 		"ahb2", CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_AHB2PMUX, -1, -1, -1 },
-		.div = { CGU_REG_CLOCKCONTROL, 12, 4, 20, -1, -1 },
+		.div = { CGU_REG_CLOCKCONTROL, 12, 0, 4, 20, -1, -1 },
 	},
 
 	[JZ4780_CLK_PCLK] = {
 		"pclk", CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_AHB2PMUX, -1, -1, -1 },
-		.div = { CGU_REG_CLOCKCONTROL, 16, 4, 20, -1, -1 },
+		.div = { CGU_REG_CLOCKCONTROL, 16, 0, 4, 20, -1, -1 },
 	},
 
 	[JZ4780_CLK_DDR] = {
 		"ddr", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { -1, JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL, -1 },
 		.mux = { CGU_REG_DDRCDR, 30, 2 },
-		.div = { CGU_REG_DDRCDR, 0, 4, 29, 28, 27 },
+		.div = { CGU_REG_DDRCDR, 0, 0, 4, 29, 28, 27 },
 	},
 
 	[JZ4780_CLK_VPU] = {
@@ -344,7 +272,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL, -1 },
 		.mux = { CGU_REG_VPUCDR, 30, 2 },
-		.div = { CGU_REG_VPUCDR, 0, 4, 29, 28, 27 },
+		.div = { CGU_REG_VPUCDR, 0, 0, 4, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR1, 2 },
 	},
 
@@ -352,7 +280,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		"i2s_pll", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_EPLL, -1, -1 },
 		.mux = { CGU_REG_I2SCDR, 30, 1 },
-		.div = { CGU_REG_I2SCDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_I2SCDR, 0, 0, 8, 29, 28, 27 },
 	},
 
 	[JZ4780_CLK_I2S] = {
@@ -366,7 +294,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_VPLL, -1 },
 		.mux = { CGU_REG_LP0CDR, 30, 2 },
-		.div = { CGU_REG_LP0CDR, 0, 8, 28, 27, 26 },
+		.div = { CGU_REG_LP0CDR, 0, 0, 8, 28, 27, 26 },
 	},
 
 	[JZ4780_CLK_LCD1PIXCLK] = {
@@ -374,7 +302,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_VPLL, -1 },
 		.mux = { CGU_REG_LP1CDR, 30, 2 },
-		.div = { CGU_REG_LP1CDR, 0, 8, 28, 27, 26 },
+		.div = { CGU_REG_LP1CDR, 0, 0, 8, 28, 27, 26 },
 	},
 
 	[JZ4780_CLK_MSCMUX] = {
@@ -386,21 +314,21 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 	[JZ4780_CLK_MSC0] = {
 		"msc0", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
-		.div = { CGU_REG_MSC0CDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_MSC0CDR, 0, 1, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 3 },
 	},
 
 	[JZ4780_CLK_MSC1] = {
 		"msc1", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
-		.div = { CGU_REG_MSC1CDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_MSC1CDR, 0, 1, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 11 },
 	},
 
 	[JZ4780_CLK_MSC2] = {
 		"msc2", CGU_CLK_DIV | CGU_CLK_GATE,
 		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
-		.div = { CGU_REG_MSC2CDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_MSC2CDR, 0, 1, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 12 },
 	},
 
@@ -409,7 +337,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL, JZ4780_CLK_OTGPHY },
 		.mux = { CGU_REG_UHCCDR, 30, 2 },
-		.div = { CGU_REG_UHCCDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_UHCCDR, 0, 0, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 24 },
 	},
 
@@ -417,7 +345,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		"ssi_pll", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL, -1, -1 },
 		.mux = { CGU_REG_SSICDR, 30, 1 },
-		.div = { CGU_REG_SSICDR, 0, 8, 29, 28, 27 },
+		.div = { CGU_REG_SSICDR, 0, 0, 8, 29, 28, 27 },
 	},
 
 	[JZ4780_CLK_SSI] = {
@@ -430,7 +358,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		"cim_mclk", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL, -1, -1 },
 		.mux = { CGU_REG_CIMCDR, 31, 1 },
-		.div = { CGU_REG_CIMCDR, 0, 8, 30, 29, 28 },
+		.div = { CGU_REG_CIMCDR, 0, 0, 8, 30, 29, 28 },
 	},
 
 	[JZ4780_CLK_PCMPLL] = {
@@ -438,7 +366,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL, JZ4780_CLK_VPLL },
 		.mux = { CGU_REG_PCMCDR, 29, 2 },
-		.div = { CGU_REG_PCMCDR, 0, 8, 28, 27, 26 },
+		.div = { CGU_REG_PCMCDR, 0, 0, 8, 28, 27, 26 },
 	},
 
 	[JZ4780_CLK_PCM] = {
@@ -453,7 +381,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { -1, JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL },
 		.mux = { CGU_REG_GPUCDR, 30, 2 },
-		.div = { CGU_REG_GPUCDR, 0, 4, 29, 28, 27 },
+		.div = { CGU_REG_GPUCDR, 0, 0, 4, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR1, 4 },
 	},
 
@@ -462,7 +390,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_VPLL, -1 },
 		.mux = { CGU_REG_HDMICDR, 30, 2 },
-		.div = { CGU_REG_HDMICDR, 0, 8, 29, 28, 26 },
+		.div = { CGU_REG_HDMICDR, 0, 0, 8, 29, 28, 26 },
 		.gate = { CGU_REG_CLKGR1, 9 },
 	},
 
@@ -471,7 +399,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 		.parents = { -1, JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL,
 			     JZ4780_CLK_EPLL },
 		.mux = { CGU_REG_BCHCDR, 30, 2 },
-		.div = { CGU_REG_BCHCDR, 0, 4, 29, 28, 27 },
+		.div = { CGU_REG_BCHCDR, 0, 0, 4, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 1 },
 	},
 
@@ -600,7 +528,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 	[JZ4780_CLK_SMB2] = {
 		"smb2", CGU_CLK_GATE,
 		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
-		.gate = { CGU_REG_CLKGR0, 24 },
+		.gate = { CGU_REG_CLKGR0, 25 },
 	},
 
 	[JZ4780_CLK_CIM] = {
@@ -712,6 +640,299 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 	},
 
 };
+
+int jz4780_cgu_set_usb_suspend(enum jz4780_usb_port port, bool suspend)
+{
+	unsigned long flags;
+	u32 opcr, bit;
+
+	switch (port) {
+	case USB_PORT_OTG:
+		bit = OPCR_SPENDN0;
+		break;
+
+	case USB_PORT_HOST:
+		bit = OPCR_SPENDN1;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	opcr = readl(cgu->base + CGU_REG_OPCR);
+	if (suspend)
+		opcr &= ~bit;
+	else
+		opcr |= bit;
+	writel(opcr, cgu->base + CGU_REG_OPCR);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_suspend);
+
+int jz4780_cgu_set_usb_otg_mode(enum jz4780_usb_otg_mode mode)
+{
+	unsigned long flags;
+	u32 usbpcr1;
+	int retval = 0;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr1 = readl(cgu->base + CGU_REG_USBPCR1);
+
+	switch (mode) {
+	case USB_OTG_MODE_MENTOR:
+		usbpcr1 &= USBPCR1_USB_SEL;
+		break;
+
+	case USB_OTG_MODE_SYNOPSYS:
+		usbpcr1 |= USBPCR1_USB_SEL;
+		break;
+
+	default:
+		retval = -EINVAL;
+		goto out;
+	}
+
+	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
+
+out:
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+
+	return retval;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_otg_mode);
+
+int jz4780_cgu_set_usb_utmi_bus_width(enum jz4780_usb_port port,
+				      enum jz4780_usb_utmi_bus_width width)
+{
+	unsigned long flags;
+	u32 usbpcr1, bit;
+	int retval = 0;
+
+	switch (port) {
+	case USB_PORT_OTG:
+		bit = USBPCR1_WORD_IF0;
+		break;
+
+	case USB_PORT_HOST:
+		bit = USBPCR1_WORD_IF1;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr1 = readl(cgu->base + CGU_REG_USBPCR1);
+
+	switch (width) {
+	case USB_PORT_UTMI_BUS_WIDTH_8:
+		usbpcr1 &= bit;
+		break;
+
+	case USB_PORT_UTMI_BUS_WIDTH_16:
+		usbpcr1 |= bit;
+		break;
+
+	default:
+		retval = -EINVAL;
+		goto out_unlock;
+	}
+
+	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
+
+out_unlock:
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return retval;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_utmi_bus_width);
+
+void jz4780_cgu_set_usb_iddigfil(u32 value)
+{
+	unsigned long flags;
+	u32 usbvbfil;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbvbfil = readl(cgu->base + CGU_REG_USBPCR1);
+	usbvbfil &= ~USBVBFIL_IDDIGFIL_MASK;
+	usbvbfil |= value;
+	writel(usbvbfil, cgu->base + CGU_REG_USBVBFIL);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_iddigfil);
+
+void jz4780_cgu_set_usb_usbvbfil(u32 value)
+{
+	unsigned long flags;
+	u32 usbvbfil;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbvbfil = readl(cgu->base + CGU_REG_USBPCR1);
+	usbvbfil &= ~USBVBFIL_USBVBFIL_MASK;
+	usbvbfil |= value;
+	writel(usbvbfil, cgu->base + CGU_REG_USBVBFIL);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_usbvbfil);
+
+void jz4780_cgu_set_usb_usbrdt(u32 value)
+{
+	unsigned long flags;
+	u32 usbrdt;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbrdt = readl(cgu->base + CGU_REG_USBRDT);
+	usbrdt &= ~USBRDT_USBRDT_MASK;
+	usbrdt |= value;
+	writel(usbrdt, cgu->base + CGU_REG_USBRDT);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_usbrdt);
+
+void jz4780_cgu_set_usb_vbfil_ld_en(bool enable)
+{
+	unsigned long flags;
+	u32 usbrdt;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbrdt = readl(cgu->base + CGU_REG_USBRDT);
+	usbrdt &= ~USBRDT_VBFIL_LD_EN;
+	usbrdt |= (enable & USBRDT_VBFIL_LD_EN);
+	writel(usbrdt, cgu->base + CGU_REG_USBRDT);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usb_vbfil_ld_en);
+
+void jz4780_cgu_usb_reset(void)
+{
+	unsigned long flags;
+	u32 usbpcr;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	usbpcr = readl(cgu + CGU_REG_USBPCR);
+	writel(usbpcr | USBPCR_POR, cgu + CGU_REG_USBPCR);
+
+	mdelay(1);
+	usbpcr = readl(cgu + CGU_REG_USBPCR);
+	writel(usbpcr & (~USBPCR_POR), cgu + CGU_REG_USBPCR);
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_usb_reset);
+
+int jz4780_cgu_set_usbpcr_param(u32 param, bool enable)
+{
+	unsigned long flags;
+	u32 usbpcr;
+
+	switch (param) {
+	case USBPCR_USB_MODE:
+	case USBPCR_COMMONONN:
+	case USBPCR_VBUSVLDEXT:
+	case USBPCR_VBUSVLDEXTSEL:
+	case USBPCR_OTG_DISABLE:
+	case USBPCR_TXPREEMPHTUNE:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+
+	usbpcr = readl(cgu->base + CGU_REG_USBPCR);
+
+	if (enable)
+		usbpcr |= param;
+	else
+		usbpcr &= ~param;
+
+	writel(usbpcr, cgu->base + CGU_REG_USBPCR);
+
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_set_usbpcr_param);
+
+void jz4780_cgu_stop_ehci(void)
+{
+	u32 reg;
+
+	reg = readl(cgu->base + CGU_REG_OPCR);
+	writel(reg & (~OPCR_SPENDN1), cgu->base + CGU_REG_OPCR);
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_stop_ehci);
+
+int jz4780_cgu_start_ehci(void)
+{
+	static int has_reset;
+	int ret = 0;
+	unsigned long flags;
+	u32 reg;
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	reg = readl(cgu->base + CGU_REG_USBPCR);
+	writel(reg & (~USBPCR_OTG_DISABLE), cgu->base + CGU_REG_USBPCR);
+
+	/* The PLL uses CLKCORE as reference */
+	reg = readl(cgu->base + CGU_REG_USBPCR1);
+	writel(reg | USBPCR1_REFCLKSEL_MASK, cgu->base + CGU_REG_USBPCR1);
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+
+	/* NOTE: hw and parent_rate aren't used, so we can set them to
+	 * whatever. They are only there for compatibility with clk_ops.*/
+	jz4780_otg_phy_set_rate(NULL,
+			clk_get_rate(cgu->clocks.clks[JZ4780_CLK_EXCLK]), 0);
+
+	spin_lock_irqsave(&cgu->power_lock, flags);
+	/* Don't force port1(uhc) into suspend mode. */
+	reg = readl(cgu->base + CGU_REG_OPCR);
+	writel(reg | OPCR_SPENDN1, cgu->base + CGU_REG_OPCR);
+
+	/* port1's pulldown resistance on D- */
+	reg = readl(cgu->base + CGU_REG_USBPCR1);
+	writel(reg | USBPCR1_DMPD1, cgu->base + CGU_REG_USBPCR1);
+
+	/* port1's pulldown resistance on D+ */
+	reg = readl(cgu->base + CGU_REG_USBPCR1);
+	writel(reg | USBPCR1_DPPD1, cgu->base + CGU_REG_USBPCR1);
+	spin_unlock_irqrestore(&cgu->power_lock, flags);
+
+	ret = jz4780_cgu_set_usb_utmi_bus_width(USB_PORT_HOST,
+			USB_PORT_UTMI_BUS_WIDTH_16);
+	if (ret)
+		return ret;
+
+	/* Set utmi data bus width of controller to 16bit */
+	reg = readl((volatile int *)EHCI_REG_UTMI_BUS);
+	writel(reg | UTMIBUS_WIDTH, (volatile int *)EHCI_REG_UTMI_BUS);
+
+	jz4780_cgu_usb_reset();
+
+	if (!has_reset) {
+		/* UHC soft reset */
+		/* TODO: Check if these delays are correct */
+		reg = readl(cgu->base + CGU_REG_SRBC);
+		writel(reg | SRBC_UHC_SR, cgu->base + CGU_REG_SRBC);
+		udelay(300);
+		reg = readl(cgu->base + CGU_REG_SRBC);
+		writel(reg & ~(SRBC_UHC_SR), cgu->base + CGU_REG_SRBC);
+		udelay(300);
+		has_reset = 1;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(jz4780_cgu_start_ehci);
 
 static void __init jz4780_cgu_init(struct device_node *np)
 {
