@@ -16,6 +16,8 @@
  */
 
 #include <linux/err.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
@@ -37,8 +39,14 @@
 #define JZ_REG_ADC_STATUS	0x0c
 
 #define JZ_REG_ADC_TOUCHSCREEN_BASE	0x10
-#define JZ_REG_ADC_BATTERY_BASE	0x1c
-#define JZ_REG_ADC_HWMON_BASE	0x20
+#define JZ_REG_ADC_BATTERY_BASE		0x1c
+#define JZ_REG_ADC_HWMON_BASE		0x20
+#define JZ_REG_ADC_CMD			0x24
+#define JZ_REG_ADC_CLKDIV		0x28
+
+#define JZ_ADC_CLKDIV		120
+#define JZ_ADC_CLKDIV_US	2
+#define JZ_ADC_CLKDIV_MS	200
 
 #define JZ_ADC_ENABLE_TOUCH	BIT(2)
 #define JZ_ADC_ENABLE_BATTERY	BIT(1)
@@ -52,18 +60,17 @@ enum {
 	JZ_ADC_IRQ_PENDOWN,
 };
 
-struct jz4740_adc {
-	struct resource *mem;
-	void __iomem *base;
+static void jz4740_adc_set_clk_div(struct jz4740_adc *adc, const u8 clkdiv,
+		const u8 clkdiv_us, const u16 clkdiv_ms)
+{
+	unsigned int val;
 
-	int irq;
-	struct irq_chip_generic *gc;
+	if (adc->version < JZ_ADC_JZ4780)
+		return;
 
-	struct clk *clk;
-	atomic_t clk_ref;
-
-	spinlock_t lock;
-};
+	val = clkdiv | (clkdiv_us << 8) | (clkdiv_ms << 16);
+	writel(val, adc->base + JZ_REG_ADC_CLKDIV);
+}
 
 static void jz4740_adc_irq_demux(struct irq_desc *desc)
 {
@@ -202,12 +209,19 @@ static const struct mfd_cell jz4740_adc_cells[] = {
 	},
 };
 
+static struct of_device_id jz4740_adc_of_match[] = {
+	{ .compatible = "ingenic,jz4740-adc", .data = (void *)JZ_ADC_JZ4740 },
+	{ .compatible = "ingenic,jz4780-adc", .data = (void *)JZ_ADC_JZ4780 },
+	{ },
+};
+
 static int jz4740_adc_probe(struct platform_device *pdev)
 {
 	struct irq_chip_generic *gc;
 	struct irq_chip_type *ct;
 	struct jz4740_adc *adc;
 	struct resource *mem_base;
+	const struct of_device_id *match;
 	int ret;
 	int irq_base;
 
@@ -217,6 +231,9 @@ static int jz4740_adc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	match = of_match_device(of_match_ptr(jz4740_adc_of_match), &pdev->dev);
+	adc->version = (enum jz4740_adc_version)match->data;
+
 	adc->irq = platform_get_irq(pdev, 0);
 	if (adc->irq < 0) {
 		ret = adc->irq;
@@ -224,7 +241,7 @@ static int jz4740_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	irq_base = platform_get_irq(pdev, 1);
+	irq_base = irq_alloc_descs(-1, 0, JZ4740_IRQ_ADC_COUNT, 0);
 	if (irq_base < 0) {
 		dev_err(&pdev->dev, "Failed to get irq base: %d\n", irq_base);
 		return irq_base;
@@ -259,7 +276,9 @@ static int jz4740_adc_probe(struct platform_device *pdev)
 	}
 
 	spin_lock_init(&adc->lock);
-	atomic_set(&adc->clk_ref, 0);
+
+	atomic_set(&adc->clk_ref, 1);
+	clk_prepare_enable(adc->clk);
 
 	platform_set_drvdata(pdev, adc);
 
@@ -282,6 +301,10 @@ static int jz4740_adc_probe(struct platform_device *pdev)
 
 	writeb(0x00, adc->base + JZ_REG_ADC_ENABLE);
 	writeb(0xff, adc->base + JZ_REG_ADC_CTRL);
+
+	jz4740_adc_set_clk_div(adc, JZ_ADC_CLKDIV - 1,
+				JZ_ADC_CLKDIV_US - 1,
+				JZ_ADC_CLKDIV_MS - 1);
 
 	ret = mfd_add_devices(&pdev->dev, 0, jz4740_adc_cells,
 			      ARRAY_SIZE(jz4740_adc_cells), mem_base,
@@ -323,6 +346,7 @@ static struct platform_driver jz4740_adc_driver = {
 	.remove = jz4740_adc_remove,
 	.driver = {
 		.name = "jz4740-adc",
+		.of_match_table = jz4740_adc_of_match,
 	},
 };
 
