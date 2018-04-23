@@ -305,7 +305,7 @@ static struct inode *iget_xattr(struct ubifs_info *c, ino_t inum)
 }
 
 static int setxattr(struct inode *host, const char *name, const void *value,
-		    size_t size, int flags)
+		    size_t size, int flags, bool check_lock)
 {
 	struct inode *inode;
 	struct ubifs_info *c = host->i_sb->s_fs_info;
@@ -314,7 +314,8 @@ static int setxattr(struct inode *host, const char *name, const void *value,
 	union ubifs_key key;
 	int err, type;
 
-	ubifs_assert(mutex_is_locked(&host->i_mutex));
+	if (check_lock)
+		ubifs_assert(mutex_is_locked(&host->i_mutex));
 
 	if (size > UBIFS_MAX_INO_DATA)
 		return -ERANGE;
@@ -371,7 +372,7 @@ int ubifs_setxattr(struct dentry *dentry, const char *name,
 	dbg_gen("xattr '%s', host ino %lu ('%pd'), size %zd",
 		name, d_inode(dentry)->i_ino, dentry, size);
 
-	return setxattr(d_inode(dentry), name, value, size, flags);
+	return setxattr(d_inode(dentry), name, value, size, flags, true);
 }
 
 ssize_t ubifs_getxattr(struct dentry *dentry, const char *name, void *buf,
@@ -606,7 +607,11 @@ static int init_xattrs(struct inode *inode, const struct xattr *xattr_array,
 		}
 		strcpy(name, XATTR_SECURITY_PREFIX);
 		strcpy(name + XATTR_SECURITY_PREFIX_LEN, xattr->name);
-		err = setxattr(inode, name, xattr->value, xattr->value_len, 0);
+		/*
+		 * creating a new inode without holding the inode rwsem,
+		 * no need to check whether inode is locked.
+		 */
+		err = setxattr(inode, name, xattr->value, xattr->value_len, 0, false);
 		kfree(name);
 		if (err < 0)
 			break;
