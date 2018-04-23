@@ -56,6 +56,16 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 #define BRCMF_BSSIDX_INVALID			-1
 
+#ifdef CONFIG_ANDROID
+#define CMD_SETSUSPENDMODE		"SETSUSPENDMODE"
+
+typedef struct android_wifi_priv_cmd {
+	char *buf;
+	int used_len;
+	int total_len;
+} android_wifi_priv_cmd;
+#endif /* CONFIG_ANDROID */
+
 /* Error bits */
 int brcmf_msg_level;
 module_param_named(debug, brcmf_msg_level, int, S_IRUSR | S_IWUSR);
@@ -667,12 +677,68 @@ static int brcmf_netdev_open(struct net_device *ndev)
 	return 0;
 }
 
+#ifdef CONFIG_ANDROID
+static int brcmf_netdev_do_ioctl(struct net_device *net, struct ifreq *ifr, int cmd)
+{
+	int ret;
+	char *command;
+	android_wifi_priv_cmd priv_cmd;
+
+
+	if (!ifr->ifr_data) {
+		ret = -EINVAL;
+		goto exit;
+	}
+	if (copy_from_user(&priv_cmd, ifr->ifr_data, sizeof(android_wifi_priv_cmd))) {
+		ret = -EFAULT;
+		goto exit;
+	}
+	command = kmalloc(priv_cmd.total_len, GFP_KERNEL);
+	if (!command)
+	{
+		brcmf_err("%s: failed to allocate memory\n", __func__);
+		ret = -ENOMEM;
+		goto exit;
+	}
+	if (copy_from_user(command, priv_cmd.buf, priv_cmd.total_len)) {
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	if (cmd == SIOCDEVPRIVATE + 1) {
+		if (strncasecmp(command, CMD_SETSUSPENDMODE, strlen(CMD_SETSUSPENDMODE)) == 0) {
+			/* TODO: implement private command SETSUSPENDMODE
+			 * This is just temporary solution to get wifi
+			 * working for Android
+			 */
+			ret = 0;
+		} else {
+			brcmf_dbg(INFO, "Unsupported private ioctl\n");
+			ret = -ENOTTY;
+		}
+	} else {
+		brcmf_err("Unsupported ioctl\n");
+		ret = -ENOTTY;
+	}
+
+exit:
+	if (command) {
+		kfree(command);
+	}
+
+	return ret;
+}
+#endif /* CONFIG_ANDROID */
+
 static const struct net_device_ops brcmf_netdev_ops_pri = {
 	.ndo_open = brcmf_netdev_open,
 	.ndo_stop = brcmf_netdev_stop,
 	.ndo_get_stats = brcmf_netdev_get_stats,
 	.ndo_start_xmit = brcmf_netdev_start_xmit,
 	.ndo_set_mac_address = brcmf_netdev_set_mac_address,
+#ifdef CONFIG_ANDROID
+	.ndo_do_ioctl = brcmf_netdev_do_ioctl,
+#endif /* CONFIG_ANDROID */
 	.ndo_set_rx_mode = brcmf_netdev_set_multicast_list
 };
 
