@@ -50,5 +50,9 @@ if FB || SGI_NEWPORT_CONSOLE
 
 endif
 
+config JZ4780_IPU
+	bool "jz4780 ipu driver"
+	default y
+	depends on MACH_JZ4780
 
 endmenu
