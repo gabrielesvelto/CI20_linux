@@ -402,5 +402,6 @@ enum cpu_type_enum {
 #define MIPS_ASE_DSP2P		0x00000040 /* Signal Processing ASE Rev 2 */
 #define MIPS_ASE_VZ		0x00000080 /* Virtualization ASE */
 #define MIPS_ASE_MSA		0x00000100 /* MIPS SIMD Architecture */
+#define MIPS_ASE_XBURSTMXU	0x80000000 /* CPU supports MIPS MT */
 
 #endif /* _ASM_CPU_H */

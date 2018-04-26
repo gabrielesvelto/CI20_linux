@@ -35,6 +35,7 @@
 #include <asm/fpu.h>
 #include <asm/irq.h>
 #include <asm/msa.h>
+#include <asm/mxu.h>
 #include <asm/pgtable.h>
 #include <asm/mipsregs.h>
 #include <asm/processor.h>
@@ -70,6 +71,8 @@ void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 	clear_used_math();
 	atomic_set(&current->thread.bd_emu_frame, BD_EMUFRAME_NONE);
 	init_dsp();
+	if (cpu_has_mxu)
+		__init_mxu();
 	regs->cp0_epc = pc;
 	regs->regs[29] = sp;
 }
@@ -101,6 +104,9 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 		_save_fp(current);
 
 	save_dsp(current);
+
+	if (cpu_has_mxu)
+		save_mxu(src);
 
 	preempt_enable();
 

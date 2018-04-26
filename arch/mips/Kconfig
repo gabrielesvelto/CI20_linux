@@ -3048,6 +3048,10 @@ config BINFMT_ELF32
 
 endmenu
 
+config MIPS_EXECUTE_ARM
+	bool "Kernel support for Magic Code"
+	default n
+
 menu "Power management options"
 
 config ARCH_HIBERNATION_POSSIBLE

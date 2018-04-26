@@ -219,6 +219,30 @@ struct mips_elf_abiflags_v0 {
 # define __MIPS_O32_FP64_MUST_BE_ZERO	EF_MIPS_FP64
 #endif
 
+#ifdef CONFIG_MIPS_EXECUTE_ARM
+#define elf_check_arch(hdr)						\
+({									\
+	int __res = 1;							\
+	struct elfhdr *__h = (hdr);					\
+									\
+	if (__h->e_machine != EM_MIPS)					\
+		__res = 0;						\
+	if (__h->e_ident[EI_CLASS] != ELFCLASS32)			\
+		__res = 0;						\
+	if ((__h->e_flags & EF_MIPS_ABI2) != 0)				\
+		__res = 0;						\
+	if (((__h->e_flags & EF_MIPS_ABI) != 0) &&			\
+	    ((__h->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_O32))		\
+		__res = 0;						\
+	if (__h->e_flags & __MIPS_O32_FP64_MUST_BE_ZERO)		\
+		__res = 0;						\
+	if (__h->e_machine == EM_ARM &&					\
+	    __h->e_ident[EI_CLASS] == ELFCLASS32)			\
+		__res = 1;						\
+									\
+	__res;								\
+})
+#else
 /*
  * This is used to ensure we don't load something for the wrong architecture.
  */
@@ -241,6 +265,7 @@ struct mips_elf_abiflags_v0 {
 									\
 	__res;								\
 })
+#endif
 
 /*
  * These are used to set parameters in the core dumps.
