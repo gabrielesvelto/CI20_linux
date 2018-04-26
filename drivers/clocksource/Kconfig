@@ -335,4 +335,17 @@ config CLKSRC_ST_LPC
 	  Enable this option to use the Low Power controller timer
 	  as clocksource.
 
+config INGENIC_TCU
+	bool
+	depends on MACH_INGENIC
+
+config JZ4780_TCU
+	bool
+	default y
+	select INGENIC_TCU
+	select CLKSRC_OF if OF
+	depends on MACH_JZ4780
+	help
+	  Support for the timer/counter unit of the Ingenic jz4780 SoC.
+
 endmenu
