@@ -391,4 +391,12 @@ config PHY_CYGNUS_PCIE
 	  Enable this to support the Broadcom Cygnus PCIe PHY.
 	  If unsure, say N.
 
+config PHY_JZ4780_USB
+	tristate "JZ4780 USB PHY driver"
+	depends on MACH_JZ4780
+	select GENERIC_PHY
+	help
+	  Enable this to support the USB transceiver that is part of
+	  JZ4780 SoC.
+
 endmenu
