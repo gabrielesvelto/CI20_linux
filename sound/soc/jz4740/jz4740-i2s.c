@@ -65,6 +65,7 @@
 #define JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_MASK \
 			(0x1f <<  JZ4780_AIC_CONF_FIFO_TX_THRESHOLD_OFFSET)
 
+#define JZ_AIC_CTRL_CHANNELS_MASK (0x7 << 24)
 #define JZ_AIC_CTRL_OUTPUT_SAMPLE_SIZE_MASK (0x7 << 19)
 #define JZ_AIC_CTRL_INPUT_SAMPLE_SIZE_MASK (0x7 << 16)
 #define JZ_AIC_CTRL_ENABLE_RX_DMA BIT(15)
@@ -81,6 +82,7 @@
 #define JZ_AIC_CTRL_ENABLE_PLAYBACK BIT(1)
 #define JZ_AIC_CTRL_ENABLE_CAPTURE BIT(0)
 
+#define JZ_AIC_CTRL_CHANNELS_OFFSET 24
 #define JZ_AIC_CTRL_OUTPUT_SAMPLE_SIZE_OFFSET 19
 #define JZ_AIC_CTRL_INPUT_SAMPLE_SIZE_OFFSET  16
 
@@ -92,7 +94,7 @@
 #define JZ_AIC_I2S_STATUS_BUSY BIT(2)
 
 #define JZ_AIC_CLK_DIV_MASK 0xf
-#define I2SDIV_DV_SHIFT 8
+#define I2SDIV_DV_SHIFT 0
 #define I2SDIV_DV_MASK (0xf << I2SDIV_DV_SHIFT)
 #define I2SDIV_IDV_SHIFT 8
 #define I2SDIV_IDV_MASK (0xf << I2SDIV_IDV_SHIFT)
@@ -210,7 +212,8 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 	conf = jz4740_i2s_read(i2s, JZ_REG_AIC_CONF);
 
-	conf &= ~(JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER);
+	conf &= ~(JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER |
+		JZ_AIC_CONF_INTERNAL_CODEC);
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS:
@@ -224,6 +227,7 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		conf |= JZ_AIC_CONF_BIT_CLK_MASTER;
 		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
+		conf |= JZ_AIC_CONF_INTERNAL_CODEC;
 		break;
 	default:
 		return -EINVAL;
@@ -283,6 +287,12 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 			ctrl |= JZ_AIC_CTRL_MONO_TO_STEREO;
 		else
 			ctrl &= ~JZ_AIC_CTRL_MONO_TO_STEREO;
+
+		if (i2s->version >= JZ_I2S_JZ4780) {
+			ctrl &= ~JZ_AIC_CTRL_CHANNELS_MASK;
+			ctrl |= (params_channels(params) - 1) <<
+				JZ_AIC_CTRL_CHANNELS_OFFSET;
+		}
 
 		div_reg &= ~I2SDIV_DV_MASK;
 		div_reg |= (div - 1) << I2SDIV_DV_SHIFT;
@@ -386,7 +396,7 @@ static void jz4740_i2c_init_pcm_config(struct jz4740_i2s *i2s)
 static int jz4740_i2s_dai_probe(struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-	uint32_t conf;
+	uint32_t conf, reg;
 
 	clk_prepare_enable(i2s->clk_aic);
 
@@ -407,6 +417,15 @@ static int jz4740_i2s_dai_probe(struct snd_soc_dai *dai)
 			JZ_AIC_CONF_I2S |
 			JZ_AIC_CONF_INTERNAL_CODEC;
 	}
+
+	/* I2S operation from SYS_CLK */
+	reg = jz4740_i2s_read(i2s, JZ_REG_AIC_I2S_FMT);
+	reg |= JZ_AIC_I2S_FMT_ENABLE_SYS_CLK;
+	jz4740_i2s_write(i2s, JZ_REG_AIC_I2S_FMT, reg);
+
+	/* enable codec sysclk */
+	clk_set_rate(i2s->clk_i2s, 12000000);
+	clk_prepare_enable(i2s->clk_i2s);
 
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, JZ_AIC_CONF_RESET);
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, conf);
