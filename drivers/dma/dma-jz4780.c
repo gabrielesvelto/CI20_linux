@@ -544,12 +544,13 @@ static size_t jz4780_dma_desc_residue(struct jz4780_dma_chan *jzchan,
 	residue = 0;
 
 	for (i = next_sg; i < desc->count; i++)
-		residue += desc->desc[i].dtc << jzchan->transfer_shift;
+		residue += (desc->desc[i].dtc & 0xffffff) << jzchan->transfer_shift;
 
 	if (next_sg != 0) {
 		count = jz4780_dma_readl(jzdma,
 					 JZ_DMA_REG_DTC(jzchan->id));
-		residue += count << jzchan->transfer_shift;
+		residue += ((desc->desc[next_sg-1].dtc & 0xffffff) - count)
+		           << jzchan->transfer_shift;
 	}
 
 	return residue;
@@ -562,6 +563,7 @@ static enum dma_status jz4780_dma_tx_status(struct dma_chan *chan,
 	struct virt_dma_desc *vdesc;
 	enum dma_status status;
 	unsigned long flags;
+	unsigned int residue;
 
 	status = dma_cookie_status(chan, cookie, txstate);
 	if ((status == DMA_COMPLETE) || (txstate == NULL))
@@ -572,13 +574,15 @@ static enum dma_status jz4780_dma_tx_status(struct dma_chan *chan,
 	vdesc = vchan_find_desc(&jzchan->vchan, cookie);
 	if (vdesc) {
 		/* On the issued list, so hasn't been processed yet */
-		txstate->residue = jz4780_dma_desc_residue(jzchan,
+		residue = jz4780_dma_desc_residue(jzchan,
 					to_jz4780_dma_desc(vdesc), 0);
 	} else if (cookie == jzchan->desc->vdesc.tx.cookie) {
-		txstate->residue = jz4780_dma_desc_residue(jzchan, jzchan->desc,
-			  (jzchan->curr_hwdesc + 1) % jzchan->desc->count);
+		residue = jz4780_dma_desc_residue(jzchan, jzchan->desc,
+			  jzchan->curr_hwdesc % jzchan->desc->count);
 	} else
-		txstate->residue = 0;
+		residue = 0;
+
+	dma_set_residue(txstate, residue);
 
 	if (vdesc && jzchan->desc && vdesc == &jzchan->desc->vdesc
 	    && jzchan->desc->status & (JZ_DMA_DCS_AR | JZ_DMA_DCS_HLT))
