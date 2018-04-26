@@ -354,6 +354,13 @@ $(boot-y): $(vmlinux-32) FORCE
 	$(Q)$(MAKE) $(build)=arch/mips/boot VMLINUX=$(vmlinux-32) \
 		$(bootvars-y) arch/mips/boot/$@
 
+# zImage
+zImage: $(vmlinux-32) FORCE
+	$(Q)$(MAKE) $(build)=arch/mips/boot/zcompressed VMLINUX=$(vmlinux-32) $@
+	@mkdir -p arch/mips/boot/compressed
+	@cp arch/mips/boot/zcompressed/$@ arch/mips/boot/compressed/$@
+	@echo '  Kernel: arch/mips/boot/compressed/$@ is ready'
+
 ifdef CONFIG_SYS_SUPPORTS_ZBOOT
 # boot/compressed
 $(bootz-y): $(vmlinux-32) FORCE
