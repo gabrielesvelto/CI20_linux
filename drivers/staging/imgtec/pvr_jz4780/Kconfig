@@ -1,0 +1,5 @@
+config POWERVR_JZ4780
+	tristate "JZ4780 graphics support"
+	depends on DRM && ION && MACH_JZ4780
+	select POWERVR_SGX
+	default n
