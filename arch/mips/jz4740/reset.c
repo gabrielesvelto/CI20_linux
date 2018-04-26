@@ -13,6 +13,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/pm.h>
@@ -21,6 +22,8 @@
 
 #include <asm/mach-jz4740/base.h>
 #include <asm/mach-jz4740/timer.h>
+#include <dt-bindings/soc/jz4780/base.h>
+#include <dt-bindings/soc/jz4780/cpm.h>
 
 #include "reset.h"
 #include "clock.h"
@@ -41,9 +44,41 @@ static void jz4740_halt(void)
 #define JZ_REG_WDT_COUNTER 0x08
 #define JZ_REG_WDT_CTRL 0x0c
 
+#define RECOVERY_SIGNATURE	(0x001a1a)
+#define REBOOT_SIGNATURE	(0x003535)
+#define BOOTLOADER_SIGNATURE	(0x004242)
+
 static void jz4740_restart(char *command)
 {
 	void __iomem *wdt_base = ioremap(JZ4740_WDT_BASE_ADDR, 0x0f);
+
+	if (command) {
+		unsigned int signature_value;
+		char *signature_name;
+
+		if (!strcmp(command, "recovery")) {
+			signature_value = RECOVERY_SIGNATURE;
+			signature_name = "recovery";
+		}
+		else if (!strcmp(command, "bootloader")) {
+			signature_value = BOOTLOADER_SIGNATURE;
+			signature_name = "bootloader";
+		} else {
+			signature_value = REBOOT_SIGNATURE;
+			signature_name = "reboot";
+		}
+
+		/*
+		 * FIXME: is it really necessary to retry this?
+		 */
+		do {
+			printk("set %s signature 0x%08x\n", signature_name, signature_value);
+			cpm_outl(0x5a5a, CPM_CPSPPR);
+			cpm_outl(signature_value, CPM_CPPSR);
+			cpm_outl(0x0, CPM_CPSPPR);
+			udelay(100);
+		} while (cpm_inl(CPM_CPPSR) != signature_value);
+	}
 
 	jz4740_timer_enable_watchdog();
 
@@ -61,10 +96,14 @@ static void jz4740_restart(char *command)
 #define JZ_REG_RTC_HIBERNATE		0x20
 #define JZ_REG_RTC_WAKEUP_FILTER	0x24
 #define JZ_REG_RTC_RESET_COUNTER	0x28
+#define JZ_REG_RTC_HWRSR		0x30
+#define JZ_REG_RTC_WENR			0x3C
 
 #define JZ_RTC_CTRL_WRDY		BIT(7)
 #define JZ_RTC_WAKEUP_FILTER_MASK	0x0000FFE0
 #define JZ_RTC_RESET_COUNTER_MASK	0x00000FE0
+#define JZ_RTC_WENR_PAT			0x0000A55A
+#define JZ_RTC_WENR_WEN			BIT(31)
 
 static inline void jz4740_rtc_wait_ready(void __iomem *rtc_base)
 {
@@ -73,6 +112,22 @@ static inline void jz4740_rtc_wait_ready(void __iomem *rtc_base)
 	do {
 		ctrl = readl(rtc_base + JZ_REG_RTC_CTRL);
 	} while (!(ctrl & JZ_RTC_CTRL_WRDY));
+}
+
+static inline void jz4740_rtc_reg_write(void __iomem *rtc_base, size_t reg,
+	uint32_t val)
+{
+	if (config_enabled(CONFIG_MACH_JZ4780)) {
+		jz4740_rtc_wait_ready(rtc_base);
+		writel(JZ_RTC_WENR_PAT, rtc_base + JZ_REG_RTC_WENR);
+		jz4740_rtc_wait_ready(rtc_base);
+
+		while (!(readl(rtc_base + JZ_REG_RTC_WENR) & JZ_RTC_WENR_WEN))
+			;
+	}
+
+	jz4740_rtc_wait_ready(rtc_base);
+	writel(val, rtc_base + reg);
 }
 
 static void jz4740_power_off(void)
@@ -98,8 +153,8 @@ static void jz4740_power_off(void)
 		wakeup_filter_ticks &= JZ_RTC_WAKEUP_FILTER_MASK;
 	else
 		wakeup_filter_ticks = JZ_RTC_WAKEUP_FILTER_MASK;
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(wakeup_filter_ticks, rtc_base + JZ_REG_RTC_WAKEUP_FILTER);
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_WAKEUP_FILTER,
+			     wakeup_filter_ticks);
 
 	/*
 	 * Set reset pin low-level assertion time after wakeup: 60 ms.
@@ -110,11 +165,13 @@ static void jz4740_power_off(void)
 		reset_counter_ticks &= JZ_RTC_RESET_COUNTER_MASK;
 	else
 		reset_counter_ticks = JZ_RTC_RESET_COUNTER_MASK;
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(reset_counter_ticks, rtc_base + JZ_REG_RTC_RESET_COUNTER);
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_RESET_COUNTER,
+			     reset_counter_ticks);
 
-	jz4740_rtc_wait_ready(rtc_base);
-	writel(1, rtc_base + JZ_REG_RTC_HIBERNATE);
+	/* Clear wake up status register */
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_HWRSR, 0x0);
+
+	jz4740_rtc_reg_write(rtc_base, JZ_REG_RTC_HIBERNATE, 1);
 
 	jz4740_halt();
 }
