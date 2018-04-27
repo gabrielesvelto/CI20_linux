@@ -2177,6 +2177,9 @@ config MIPS_CPU_SCACHE
 	bool
 	select BOARD_SCACHE
 
+config XBURST_CACHE
+	bool "Support for Ingenic's Xburst cache"
+
 config R5000_CPU_SCACHE
 	bool
 	select BOARD_SCACHE
@@ -2206,7 +2209,7 @@ config CPU_R4K_FPU
 
 config CPU_R4K_CACHE_TLB
 	bool
-	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON)
+	default y if !(CPU_R3000 || CPU_R8000 || CPU_SB1 || CPU_TX39XX || CPU_CAVIUM_OCTEON || (MACH_JZ4780 && XBURST_CACHE))
 
 config MIPS_MT_SMP
 	bool "MIPS MT SMP support (1 TC on each available VPE)"

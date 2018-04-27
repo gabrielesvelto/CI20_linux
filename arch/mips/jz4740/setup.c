@@ -33,6 +33,8 @@
 #define JZ4740_EMC_SDRAM_CTRL 0x80
 
 unsigned long dtb_addr;
+int coherentio;         /* init to 0, no DMA cache coherency */
+int hw_coherentio;      /* init to 0, no HW DMA cache coherency */
 
 static int __init early_parse_dtbaddr(char *p)
 {
