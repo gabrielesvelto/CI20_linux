@@ -339,15 +339,83 @@ static void jz4780_send_ipi_mask(const struct cpumask *mask,
 #ifdef CONFIG_HOTPLUG_CPU
 int jz4780_cpu_disable(void)
 {
+	unsigned int cpu = smp_processor_id();
+	unsigned int status;
+
+	local_irq_disable();
+
+	set_cpu_online(cpu, false);
+	cpumask_clear_cpu(cpu, &cpu_callin_map);
+
+	spin_lock(&smp_lock);
+	status = read_c0_reim();
+	if (status & (1 << (cpu + 8))) {
+		status &= ~(1 << (cpu + 8));
+		status |= (1 << 8); /* irq to cpu0 */
+		write_c0_reim(status);
+	}
+
+	spin_unlock(&smp_lock);
+
 	return 0;
 }
 
 void jz4780_cpu_die(unsigned int cpu)
 {
+	unsigned long flags;
+	unsigned int status;
+
+	local_irq_save(flags);
+
+	cpumask_clear_cpu(cpu, &cpu_running);
+
+	wmb();
+	do {
+		status = read_c0_corestatus();
+	} while (!(status & (1 << (cpu + 16))));
+
+	cpm_set_bit(31, CPM_LCR);
+	cpm_set_bit(15, CPM_CLKGR1);
+
+	local_irq_restore(flags);
+}
+
+void __play_dead(void)
+{
+	__asm__ __volatile__ (
+	"	.set	push	\n"
+	"	.set	mips3	\n"
+	"	sync		\n"
+	"	wait		\n"
+	"	.set	pop	\n");
 }
 
 void play_dead(void) {
-	return;
+	void (*do_play_dead)(void) = (void (*)(void)) KSEG1ADDR(__play_dead);
+	unsigned int cpu = smp_processor_id();
+
+
+	local_irq_disable();
+
+	switch (cpu) {
+	case 0:
+		write_c0_mailbox0(0);
+		break;
+	case 1:
+		write_c0_mailbox1(0);
+		break;
+	}
+
+	smp_clr_pending(1 << cpu);
+
+	while(1) {
+		while(cpumask_test_cpu(cpu, &cpu_running))
+			;
+		blast_icache32();
+		blast_dcache32();
+
+		do_play_dead();
+	}
 }
 #endif
 
