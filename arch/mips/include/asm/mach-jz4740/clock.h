@@ -15,6 +15,7 @@
 #ifndef __ASM_JZ4740_CLOCK_H__
 #define __ASM_JZ4740_CLOCK_H__
 
+#ifdef CONFIG_MACH_JZ4740
 enum jz4740_wait_mode {
 	JZ4740_WAIT_MODE_IDLE,
 	JZ4740_WAIT_MODE_SLEEP,
@@ -27,5 +28,9 @@ void jz4740_clock_resume(void);
 
 void jz4740_clock_udc_enable_auto_suspend(void);
 void jz4740_clock_udc_disable_auto_suspend(void);
+#endif	/* CONFIG_MACH_JZ4740 */
+
+void ingenic_tcu_enable_clocks(void);
+void ingenic_tcu_disable_clocks(void);
 
 #endif
