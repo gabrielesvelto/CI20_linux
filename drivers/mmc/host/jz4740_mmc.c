@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/scatterlist.h>
 #include <linux/clk.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/bitops.h>
 #include <linux/gpio.h>
@@ -950,6 +951,12 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 
 	mmc->max_segs = 128;
 	mmc->max_seg_size = mmc->max_req_size;
+
+	if (of_find_property(pdev->dev.of_node, "keep-power-in-suspend", NULL)) {
+		mmc->pm_caps |= MMC_PM_KEEP_POWER;
+		mmc->caps |= MMC_CAP_NONREMOVABLE;
+		pm_runtime_forbid(mmc->parent);
+	}
 
 	host->mmc = mmc;
 	host->pdev = pdev;
