@@ -287,6 +287,7 @@ static struct irq_chip jz4780_gpio_irq_chip = {
 	.irq_mask	= jz4780_gpio_irq_mask,
 	.irq_ack	= jz4780_gpio_irq_ack,
 	.irq_set_type	= jz4780_gpio_irq_set_type,
+	.flags		= IRQCHIP_SKIP_SET_WAKE,
 };
 
 static void jz4780_gpio_irq_handler(struct irq_desc *desc)
