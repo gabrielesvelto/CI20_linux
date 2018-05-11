@@ -149,6 +149,7 @@ struct board_info {
 	u32		wake_state;
 
 	int		ip_summed;
+	int		reset_gpios;
 };
 
 /* debug code */
@@ -1501,6 +1502,7 @@ dm9000_probe(struct platform_device *pdev)
 
 	db->dev = &pdev->dev;
 	db->ndev = ndev;
+	db->reset_gpios = reset_gpios;
 
 	spin_lock_init(&db->lock);
 	mutex_init(&db->addr_lock);
@@ -1764,6 +1766,13 @@ dm9000_drv_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct board_info *db = netdev_priv(ndev);
+
+#ifdef CONFIG_JZ4780_CI20
+	gpio_set_value(db->reset_gpios, 1);
+	/* Needs 3ms to read eeprom when PWRST is deasserted */
+	msleep(4);
+	iow(db, DM9000_GPR, 0);
+#endif
 
 	if (ndev) {
 		if (netif_running(ndev)) {
