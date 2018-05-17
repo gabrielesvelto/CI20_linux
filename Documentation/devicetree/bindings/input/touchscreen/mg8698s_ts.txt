@@ -1,0 +1,28 @@
+* * mg8698s touchscreen controler
+
+Required properties:
+- compatible: must be "tcs,mg8698_tcs"
+- reg: I2C address of the chip
+- interrupt: interrupt GPIO
+- wake-gpio: enable GPIO
+- x-size: horizontal resolution of touchscreen
+- y-size: vertical resolution of touchscreen
+
+Example:
+
+	i2c@00000000 {
+		/* ... */
+
+		mg8698s_ts {
+			compatible = "tcs,mg8698_tcs";
+			reg = <0x44>;
+
+			wake-gpios = <&gpf 18 GPIO_ACTIVE_LOW>;
+			interrupt = <&gpf 19 GPIO_ACTIVE_LOW>;
+
+			x-size = <1344>;
+			y-size = <960>;
+		};
+
+		/* ... */
+	};
