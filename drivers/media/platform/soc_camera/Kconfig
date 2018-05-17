@@ -8,6 +8,13 @@ config SOC_CAMERA
 	  over a bus like PCI or USB. For example some i2c camera connected
 	  directly to the data bus of an SoC.
 
+config MULTIPLE_V4L2_SUBDEVICES
+	bool "Enable multiple camera sensor subdevices"
+	depends on SOC_CAMERA
+	help
+	  This option enables multiple camera sensor subdevices binding
+	  for the systems that support it.
+
 config SOC_CAMERA_SCALE_CROP
 	tristate
 

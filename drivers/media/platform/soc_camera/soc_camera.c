@@ -1723,6 +1723,7 @@ static void scan_of_host(struct soc_camera_host *ici)
 		}
 
 		/* so we now have a remote node to connect */
+#ifndef CONFIG_MULTIPLE_V4L2_SUBDEVICES
 		if (!i)
 			soc_of_bind(ici, epn, ren->parent);
 
@@ -1732,6 +1733,12 @@ static void scan_of_host(struct soc_camera_host *ici)
 			dev_err(dev, "multiple subdevices aren't supported yet!\n");
 			break;
 		}
+#else
+		soc_of_bind(ici, epn, ren->parent);
+
+		of_node_put(epn);
+		of_node_put(ren);
+#endif
 	}
 
 	of_node_put(epn);
