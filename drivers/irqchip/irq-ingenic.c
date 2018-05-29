@@ -114,9 +114,17 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 	struct irq_domain *domain;
 	int parent_irq, err = 0;
 	unsigned i;
+	u32 *wakeup_masks;
 
 	intc = kzalloc(sizeof(*intc), GFP_KERNEL);
 	if (!intc) {
+		err = -ENOMEM;
+		goto out_err;
+	}
+
+	wakeup_masks = kzalloc(sizeof(u32) * num_chips, GFP_KERNEL);
+	if (!wakeup_masks) {
+		pr_err("Failed to allocate wakeup_masks array\n");
 		err = -ENOMEM;
 		goto out_err;
 	}
@@ -138,6 +146,9 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 		goto out_unmap_irq;
 	}
 
+	of_property_read_u32_array(node, "gpio-wakeup-masks",
+				    wakeup_masks, num_chips);
+
 	for (i = 0; i < num_chips; i++) {
 		/* Mask all irqs */
 		writel(0xffffffff, intc->base + (i * CHIP_SIZE) +
@@ -149,6 +160,8 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 					    handle_level_irq);
 
 		gc->wake_enabled = IRQ_MSK(32);
+
+		gc->wake_active = wakeup_masks[i];
 
 		ct = gc->chip_types;
 		ct->regs.enable = JZ_REG_INTC_CLEAR_MASK;
@@ -170,12 +183,14 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 		pr_warn("unable to register IRQ domain\n");
 
 	setup_irq(parent_irq, &intc_cascade_action);
+	kfree(wakeup_masks);
 	return 0;
 
 out_unmap_irq:
 	irq_dispose_mapping(parent_irq);
 out_free:
 	kfree(intc);
+	kfree(wakeup_masks);
 out_err:
 	return err;
 }
