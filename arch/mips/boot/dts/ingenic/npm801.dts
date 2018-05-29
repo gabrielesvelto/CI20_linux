@@ -452,3 +452,6 @@
 	};
 };
 
+&intc {
+	gpio-wakeup-masks = <0x20000 0x0>;
+};
