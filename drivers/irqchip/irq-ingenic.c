@@ -112,6 +112,7 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 	struct irq_chip_generic *gc;
 	struct irq_chip_type *ct;
 	struct irq_domain *domain;
+	struct irq_desc *desc;
 	int parent_irq, err = 0;
 	unsigned i;
 	u32 *wakeup_masks;
@@ -183,6 +184,11 @@ static int __init ingenic_intc_of_init(struct device_node *node,
 		pr_warn("unable to register IRQ domain\n");
 
 	setup_irq(parent_irq, &intc_cascade_action);
+
+	desc = irq_to_desc(parent_irq);
+	irq_desc_get_chip(desc)->flags |= IRQCHIP_SKIP_SET_WAKE;
+	enable_irq_wake(parent_irq);
+
 	kfree(wakeup_masks);
 	return 0;
 
