@@ -18,9 +18,9 @@
 #include <linux/delay.h>
 #include <linux/suspend.h>
 
-#ifdef CONFIG_MACH_JZ4740
 #include <asm/mach-jz4740/clock.h>
 
+#ifdef CONFIG_MACH_JZ4740
 static int jz4740_pm_enter(suspend_state_t state)
 {
 	jz4740_clock_suspend();
@@ -55,6 +55,15 @@ late_initcall(jz4740_pm_init);
 #ifdef CONFIG_MACH_JZ4780
 static int jz4780_pm_enter(suspend_state_t state)
 {
+	ingenic_tcu_disable_clocks();
+
+	__asm__(
+	"	.set push;	\n"
+	"	.set mips3;	\n"
+	"	wait;		\n"
+	"	.set pop;	\n");
+
+	ingenic_tcu_enable_clocks();
 	return 0;
 }
 
