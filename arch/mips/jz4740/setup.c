@@ -21,6 +21,7 @@
 #include <linux/libfdt.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#include <linux/string.h>
 
 #include <asm/bootinfo.h>
 #include <asm/prom.h>
@@ -35,10 +36,28 @@
 unsigned long dtb_addr;
 int coherentio;         /* init to 0, no DMA cache coherency */
 int hw_coherentio;      /* init to 0, no HW DMA cache coherency */
+void *fdt;
+
+#ifdef CONFIG_USE_OF
+
+void __init *plat_get_fdt(void) {
+	unsigned long dtb_addr;
+	char *substr;
+	substr = strstr(arcs_cmdline, "dtb_addr=");
+	if (!substr)
+		return (void*) __dtb_start;
+	sscanf(substr, "dtb_addr=%lx", &dtb_addr);
+	fdt = (void*) dtb_addr;
+	return fdt;
+}
+
+#endif	/* CONFIG_USE_OF */
 
 static int __init early_parse_dtbaddr(char *p)
 {
+	unsigned long dtb_addr;
 	dtb_addr = memparse(p, &p);
+	fdt = (void*) dtb_addr;
 	return 0;
 }
 early_param("dtb_addr", early_parse_dtbaddr);
@@ -82,14 +101,12 @@ void __init plat_mem_setup(void)
 
 void __init device_tree_init(void)
 {
-	void *fdt = (void *) dtb_addr;
-
-	if (!dtb_addr || fdt_check_header(fdt)) {
+	if (!fdt || fdt_check_header(fdt)) {
 		if (!initial_boot_params)
 			return;
 		printk("Using integrated dtb\n");
 	} else {
-		printk("Using dtb at address %lx\n", dtb_addr);
+		printk("Using dtb at address %p\n", fdt);
 		initial_boot_params = fdt;
 	}
 
