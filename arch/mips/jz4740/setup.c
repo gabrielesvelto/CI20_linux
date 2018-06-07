@@ -51,8 +51,16 @@ void __init *plat_get_fdt(void) {
 	return fdt;
 }
 
+#ifdef CONFIG_RELOCATABLE
+
+void __init plat_fdt_relocated(void *new_location) {
+	fdt = new_location;
+}
+
+#endif	/* CONFIG_RELOCATABLE */
 #endif	/* CONFIG_USE_OF */
 
+#if !defined(CONFIG_RELOCATABLE) || !defined(CONFIG_USE_OF)
 static int __init early_parse_dtbaddr(char *p)
 {
 	unsigned long dtb_addr;
@@ -61,6 +69,7 @@ static int __init early_parse_dtbaddr(char *p)
 	return 0;
 }
 early_param("dtb_addr", early_parse_dtbaddr);
+#endif
 
 static void __init jz4740_detect_mem(void)
 {
