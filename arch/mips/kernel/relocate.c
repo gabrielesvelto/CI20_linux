@@ -22,6 +22,9 @@
 #include <linux/start_kernel.h>
 #include <linux/string.h>
 #include <linux/printk.h>
+#ifdef CONFIG_MACH_JZ4780
+#include <asm/r4kcache.h>
+#endif
 
 #define RELOCATED(x) ((void *)((long)x + offset))
 
@@ -42,6 +45,8 @@ int __weak plat_post_relocation(long offset)
 {
 	return 0;
 }
+
+#ifndef CONFIG_MACH_JZ4780
 
 static inline u32 __init get_synci_step(void)
 {
@@ -69,6 +74,8 @@ static void __init sync_icache(void *kbase, unsigned long kernel_length)
 	/* Completion barrier */
 	__sync();
 }
+
+#endif	/* CONFIG_MACH_JZ4780 */
 
 static int __init apply_r_mips_64_rel(u32 *loc_orig, u32 *loc_new, long offset)
 {
@@ -362,7 +369,18 @@ void *__init relocate_kernel(void)
 			goto out;
 
 		/* Sync the caches ready for execution of new kernel */
+#ifdef CONFIG_MACH_JZ4780
+		/*
+		 * rdhwr instruction for getting SYNCI step causes a
+		 * reserved instruction exception on Ingenic JZ4780.
+		 * Because of that, directly call functions for
+		 * syncing data and instruction cache instead of sync_icache.
+		 */
+		blast_dcache32();
+		blast_icache32();
+#else
 		sync_icache(loc_new, kernel_length);
+#endif
 
 		res = relocate_exception_table(offset);
 		if (res < 0)
