@@ -88,7 +88,7 @@ static struct uid_entry *find_or_register_uid_locked(uid_t uid)
 {
 	struct uid_entry *uid_entry, *temp;
 	unsigned int max_state = READ_ONCE(next_offset);
-	size_t alloc_size = sizeof(uid_entry) + max_state *
+	size_t alloc_size = sizeof(*uid_entry) + max_state *
 		sizeof(uid_entry->time_in_state[0]);
 
 	uid_entry = find_uid_entry_locked(uid);
@@ -105,8 +105,10 @@ static struct uid_entry *find_or_register_uid_locked(uid_t uid)
 		memset(temp->time_in_state + uid_entry->max_state, 0,
 		       (max_state - uid_entry->max_state) *
 		       sizeof(uid_entry->time_in_state[0]));
-		hlist_replace_rcu(&uid_entry->hash, &temp->hash);
-		kfree_rcu(uid_entry, rcu);
+		if (temp != uid_entry) {
+			hlist_replace_rcu(&uid_entry->hash, &temp->hash);
+			kfree_rcu(uid_entry, rcu);
+		}
 		return temp;
 	}
 
@@ -201,8 +203,12 @@ static int uid_time_in_state_seq_show(struct seq_file *m, void *v)
 			if (!freqs || freqs == last_freqs)
 				continue;
 			last_freqs = freqs;
-			for (i = 0; i < freqs->max_state; i++)
+			for (i = 0; i < freqs->max_state; i++) {
+				if (freqs->freq_table[i] ==
+				    CPUFREQ_ENTRY_INVALID)
+					continue;
 				seq_printf(m, " %d", freqs->freq_table[i]);
+			}
 		}
 		seq_putc(m, '\n');
 	}
@@ -287,7 +293,6 @@ int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
 	unsigned int cpu, i;
 	cputime_t cputime;
 	unsigned long flags;
-	u64 *times;
 	struct cpu_freqs *freqs;
 	struct cpu_freqs *last_freqs = NULL;
 
@@ -305,7 +310,7 @@ int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
 			cputime = 0;
 			if (freqs->offset + i < p->max_state &&
 			    p->time_in_state)
-				cputime = times[freqs->offset + i];
+				cputime = p->time_in_state[freqs->offset + i];
 			seq_printf(m, "%u %lu\n", freqs->freq_table[i],
 				   (unsigned long)cputime_to_clock_t(cputime));
 		}
